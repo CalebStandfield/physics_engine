@@ -138,8 +138,10 @@ pub trait Scenario {
 
     /// Applied after every step, to enforce things a force law cannot express:
     /// a block stopping at the bottom of a ramp, static friction pinning a body
-    /// in place. Default is a free system with nothing to enforce.
-    fn constrain(&self, _state: &mut State) {}
+    /// that just came to rest. Gets the state from before the step too, so a
+    /// scenario can notice a velocity that flipped sign mid-step. Default is a
+    /// free system with nothing to enforce.
+    fn constrain(&self, _previous: &State, _state: &mut State) {}
 
     /// World-space geometry and the free-body diagram at this state.
     fn frame(&self, state: &State) -> Frame;

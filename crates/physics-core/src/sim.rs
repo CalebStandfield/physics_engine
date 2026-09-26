@@ -136,7 +136,7 @@ impl Simulation {
             let system = ScenarioSystem(&*self.scenario);
             self.integrator.step(&system, &self.state, dt)
         };
-        self.scenario.constrain(&mut next);
+        self.scenario.constrain(&self.state, &mut next);
 
         // Friction and damping are path-dependent, so the loss is accumulated
         // here rather than recomputed from the state.

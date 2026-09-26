@@ -5,12 +5,16 @@
 
 use physics_core::scenario::Scenario;
 
+use crate::incline::InclineScenario;
 use crate::spring::SpringScenario;
 
 type Factory = fn() -> Box<dyn Scenario>;
 
 /// Every scenario the engine ships, in the order a UI should list them.
-static SCENARIOS: &[(&str, Factory)] = &[("spring", || Box::new(SpringScenario::new()))];
+static SCENARIOS: &[(&str, Factory)] = &[
+    ("spring", || Box::new(SpringScenario::new())),
+    ("incline", || Box::new(InclineScenario::new())),
+];
 
 /// Ids of every available scenario.
 pub fn ids() -> Vec<&'static str> {
