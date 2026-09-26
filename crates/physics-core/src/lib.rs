@@ -7,13 +7,17 @@
 pub mod integrator;
 pub mod math;
 pub mod params;
+pub mod record;
 pub mod scenario;
+pub mod sim;
 pub mod state;
 pub mod system;
 
 pub use integrator::Integrator;
 pub use math::{Vec2, G};
 pub use params::{ParamError, ParamSpec};
+pub use record::Recorder;
+pub use sim::{Simulation, Snapshot};
 pub use scenario::{Derived, ForceVector, Frame, Guide, Scenario};
 pub use state::State;
 pub use system::System;

@@ -149,6 +149,14 @@ pub trait Scenario {
         Vec::new()
     }
 
+    /// Rate at which non-conservative forces (friction, damping) are removing
+    /// energy from the body, watts, never negative. The driver multiplies this
+    /// by `dt` each step to track total energy lost, which is the only
+    /// path-dependent quantity in the engine. Default is a lossless system.
+    fn dissipated_power(&self, _state: &State) -> f64 {
+        0.0
+    }
+
     /// Position the oscillation detector should measure crossings about, in
     /// scenario coordinates. `None` for a system that does not oscillate.
     fn equilibrium(&self) -> Option<f64> {
