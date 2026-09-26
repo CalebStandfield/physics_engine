@@ -133,6 +133,20 @@ impl Simulation {
         &mut self.recorder
     }
 
+    /// Swap in a differently sized recorder. Starts it on the current state so
+    /// the new recording is never empty.
+    pub fn set_recorder(&mut self, mut recorder: Recorder) {
+        recorder.clear();
+        recorder.push(self.state);
+        self.recorder = recorder;
+    }
+
+    /// Replace the scenario and start it from its own initial state.
+    pub fn set_scenario(&mut self, scenario: Box<dyn Scenario>) {
+        self.scenario = scenario;
+        self.reset();
+    }
+
     /// Back to the scenario's initial state, clock and recording cleared.
     /// Parameters are kept.
     pub fn reset(&mut self) {
