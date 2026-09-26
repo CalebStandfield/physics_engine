@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::analysis::PeriodDetector;
 use crate::integrator::{default_integrator, Integrator};
 use crate::record::Recorder;
 use crate::scenario::{Derived, Frame, Scenario, ScenarioSystem};
@@ -29,8 +30,20 @@ pub struct Snapshot {
     pub energy_lost: f64,
     /// Fixed steps taken since the last reset.
     pub steps: u64,
+    /// Period measured from the run itself, seconds. `None` for a system that
+    /// does not oscillate, or before one full cycle has gone by.
+    pub measured_period: Option<f64>,
+    /// Complete cycles seen since the last reset.
+    pub cycles: usize,
     pub frame: Frame,
     pub derived: Vec<Derived>,
+}
+
+impl Snapshot {
+    /// One derived quantity by key, if the scenario reports it.
+    pub fn derived_value(&self, key: &str) -> Option<f64> {
+        self.derived.iter().find(|d| d.key == key).map(|d| d.value)
+    }
 }
 
 /// Owns a scenario, an integrator, and the clock that connects them.
@@ -47,6 +60,7 @@ pub struct Simulation {
     steps: u64,
     energy_lost: f64,
     recorder: Recorder,
+    detector: Option<PeriodDetector>,
 }
 
 impl Simulation {
@@ -55,6 +69,7 @@ impl Simulation {
         let state = scenario.initial_state();
         let mut recorder = Recorder::default();
         recorder.push(state);
+        let detector = scenario.equilibrium().map(PeriodDetector::about);
         Self {
             scenario,
             integrator: default_integrator(),
@@ -64,6 +79,7 @@ impl Simulation {
             steps: 0,
             energy_lost: 0.0,
             recorder,
+            detector,
         }
     }
 
@@ -126,6 +142,19 @@ impl Simulation {
         self.energy_lost = 0.0;
         self.recorder.clear();
         self.recorder.push(self.state);
+        // Rebuilt rather than cleared: a parameter change can move the level
+        // the crossings are counted about.
+        self.detector = self.scenario.equilibrium().map(PeriodDetector::about);
+    }
+
+    /// Period measured from the run so far, seconds.
+    pub fn measured_period(&self) -> Option<f64> {
+        self.detector.as_ref().and_then(|d| d.period())
+    }
+
+    /// Complete oscillations seen since the last reset.
+    pub fn cycles(&self) -> usize {
+        self.detector.as_ref().map_or(0, |d| d.cycles())
     }
 
     /// One fixed step. The integrator moves the state, then the scenario gets
@@ -145,6 +174,9 @@ impl Simulation {
         self.state = next;
         self.steps += 1;
         self.recorder.observe(next);
+        if let Some(detector) = self.detector.as_mut() {
+            detector.observe(next);
+        }
     }
 
     /// Take `count` fixed steps.
@@ -206,6 +238,8 @@ impl Simulation {
             accel: self.accel(),
             energy_lost: self.energy_lost,
             steps: self.steps,
+            measured_period: self.measured_period(),
+            cycles: self.cycles(),
             frame: self.scenario.frame(&self.state),
             derived: self.scenario.derived(&self.state),
         }
