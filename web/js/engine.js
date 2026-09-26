@@ -1,0 +1,116 @@
+// Thin wrapper over the wasm Engine: module init, run/pause state, and a
+// snapshot cached once per frame so four panels share one boundary crossing.
+//
+// No physics lives here. Every number comes back out of wasm.
+
+import init, {
+  Engine,
+  scenario_catalog,
+  integrators,
+  percent_difference,
+} from "../pkg/physics_wasm.js";
+
+const MAX_FRAME = 0.1; // s of real time fed to the engine in one go
+
+export class Sim {
+  constructor(engine, catalog, integratorList) {
+    this.engine = engine;
+    this.catalog = catalog;
+    this.integrators = integratorList;
+    this.running = false;
+    this.snap = engine.snapshot();
+  }
+
+  static async boot(scenarioId) {
+    await init();
+    const catalog = scenario_catalog();
+    const list = integrators();
+    const id = scenarioId ?? catalog[0].id;
+    return new Sim(new Engine(id), catalog, list);
+  }
+
+  // ---- scenario ----
+
+  get id() {
+    return this.engine.scenarioId;
+  }
+
+  get entry() {
+    return this.catalog.find((c) => c.id === this.id);
+  }
+
+  loadScenario(id) {
+    this.engine.loadScenario(id);
+    this.refresh();
+  }
+
+  schema() {
+    return this.engine.schema();
+  }
+
+  getParam(key) {
+    return this.engine.getParam(key);
+  }
+
+  setParam(key, value) {
+    this.engine.setParam(key, value);
+    this.refresh();
+  }
+
+  // ---- solver ----
+
+  get integratorId() {
+    return this.engine.integratorId;
+  }
+
+  setIntegrator(id) {
+    this.engine.setIntegrator(id);
+  }
+
+  get dt() {
+    return this.engine.dt;
+  }
+
+  setDt(dt) {
+    this.engine.dt = dt;
+  }
+
+  // ---- transport ----
+
+  play() {
+    this.running = true;
+  }
+
+  pause() {
+    this.running = false;
+  }
+
+  reset() {
+    this.engine.reset();
+    this.refresh();
+  }
+
+  // Step by real elapsed seconds and re-read state. Returns true when the
+  // engine actually moved.
+  tick(elapsed) {
+    if (!this.running) return false;
+    this.engine.advance(Math.min(elapsed, MAX_FRAME));
+    this.refresh();
+    return true;
+  }
+
+  refresh() {
+    this.snap = this.engine.snapshot();
+  }
+
+  // ---- readout helpers ----
+
+  derived(key) {
+    const row = this.snap.derived.find((d) => d.key === key);
+    return row ? row.value : undefined;
+  }
+
+  percentDifference(a, b) {
+    return percent_difference(a, b);
+  }
+}
