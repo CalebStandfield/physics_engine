@@ -9,7 +9,7 @@ import { arrow, roundedRect, label, fitCanvas } from "./draw.js";
 
 const BODY = 26; // px
 const MARGIN = 46; // px kept clear for labels
-const MIN_ARROW = 12; // px, so a small-but-real force still reads
+const MIN_ARROW = 18; // px, so a small-but-real force still reads
 
 export class FbdRenderer {
   constructor(canvas) {

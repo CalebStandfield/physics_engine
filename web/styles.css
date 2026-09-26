@@ -443,3 +443,18 @@ select:focus {
 .boot.hidden {
   display: none;
 }
+
+/* Narrow desktops: give the scene room back by slimming the side panels. */
+@media (max-width: 1180px) {
+  .panel-controls {
+    width: 240px;
+  }
+
+  .col-right {
+    width: 240px;
+  }
+
+  #fbd {
+    height: 160px;
+  }
+}
