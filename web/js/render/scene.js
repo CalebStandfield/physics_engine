@@ -13,6 +13,44 @@ const DEPTH = { reference: 0, surface: 1, anchor: 1, spring: 2, axis: 3 };
 const MAX_FORCE_PX = 110; // longest force arrow in the scene
 const REF_MASS = 1.0; // kg the body size is calibrated against
 
+// Room left around the geometry for force arrows and their labels.
+const ARROW_ROOM = MAX_FORCE_PX + 40;
+
+function pad(inset = {}) {
+  return {
+    left: (inset.left ?? 0) + ARROW_ROOM,
+    right: (inset.right ?? 0) + ARROW_ROOM,
+    top: (inset.top ?? 0) + ARROW_ROOM,
+    bottom: (inset.bottom ?? 0) + ARROW_ROOM,
+  };
+}
+
+// Where a reference line's label goes: just past whichever end of the line is
+// farthest from the block. Always anchoring the same end buries the label
+// under the body on any line that starts there.
+const LABEL_OFFSET = 9; // px past the end of the line
+
+function labelAnchor(pts, bodyPx) {
+  const a = pts[0];
+  const b = pts[pts.length - 1];
+  const dist = (p) => Math.hypot(p.x - bodyPx.x, p.y - bodyPx.y);
+  const far = dist(b) >= dist(a) ? b : a;
+  const near = far === b ? a : b;
+
+  const dx = far.x - near.x;
+  const dy = far.y - near.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+
+  return {
+    x: far.x + ux * LABEL_OFFSET,
+    y: far.y + uy * LABEL_OFFSET,
+    align: ux > 0.3 ? "left" : ux < -0.3 ? "right" : "center",
+    baseline: uy > 0.3 ? "top" : uy < -0.3 ? "bottom" : "middle",
+  };
+}
+
 export class SceneRenderer {
   constructor(canvas, camera) {
     this.canvas = canvas;
@@ -21,10 +59,11 @@ export class SceneRenderer {
   }
 
   // `mass` only sets how big the block looks; it changes no physics.
-  draw(frame, mass) {
+  // `inset` is the area the overlay panels cover, in CSS pixels.
+  draw(frame, mass, inset) {
     const { width, height } = fitCanvas(this.canvas, this.ctx);
     this.camera.observe(frame);
-    this.camera.fit(width, height);
+    this.camera.fit(width, height, pad(inset));
     if (!this.camera.ready) return;
 
     const px = (p) => this.camera.toPx(p);
@@ -32,10 +71,10 @@ export class SceneRenderer {
       (a, b) => (DEPTH[a.kind] ?? 0) - (DEPTH[b.kind] ?? 0),
     );
 
-    for (const guide of guides) this.drawGuide(guide, px);
+    const center = px(frame.body);
+    for (const guide of guides) this.drawGuide(guide, px, center);
 
     const side = this.bodySize(width, height, mass);
-    const center = px(frame.body);
     roundedRect(this.ctx, center.x, center.y, side, side, 4, {
       fill: COLOR.bodyFill,
       stroke: COLOR.orange,
@@ -52,7 +91,7 @@ export class SceneRenderer {
     return Math.max(18, Math.min(64, base * Math.max(0.6, Math.min(1.8, growth))));
   }
 
-  drawGuide(guide, px) {
+  drawGuide(guide, px, bodyPx) {
     const style = guideStyle(guide.kind);
     const pts = guide.points.map(px);
     if (pts.length < 2) return;
@@ -76,8 +115,12 @@ export class SceneRenderer {
     }
 
     if (guide.kind === "reference") {
-      const end = pts[pts.length - 1];
-      label(this.ctx, guide.label, end.x + 8, end.y, { color: COLOR.muted });
+      const at = labelAnchor(pts, bodyPx);
+      label(this.ctx, guide.label, at.x, at.y, {
+        color: COLOR.muted,
+        align: at.align,
+        baseline: at.baseline,
+      });
     }
   }
 

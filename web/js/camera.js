@@ -41,15 +41,24 @@ export class Camera {
   }
 
   // Recompute the projection for a canvas of this size, in CSS pixels.
-  fit(width, height) {
+  //
+  // `inset` is the region the panels are covering, so the scene fits in what
+  // is actually visible rather than centering under a panel.
+  fit(width, height, inset = { left: 0, right: 0, top: 0, bottom: 0 }) {
     if (!this.box) return;
+
+    const availW = Math.max(80, width - inset.left - inset.right);
+    const availH = Math.max(80, height - inset.top - inset.bottom);
 
     const w = Math.max(this.box.maxX - this.box.minX, 1e-6);
     const h = Math.max(this.box.maxY - this.box.minY, 1e-6);
     const target = {
       cx: (this.box.minX + this.box.maxX) / 2,
       cy: (this.box.minY + this.box.maxY) / 2,
-      scale: Math.min(width / (w * (1 + 2 * PAD)), height / (h * (1 + 2 * PAD))),
+      scale: Math.min(
+        availW / (w * (1 + 2 * PAD)),
+        availH / (h * (1 + 2 * PAD)),
+      ),
     };
 
     if (!this.view) {
@@ -60,8 +69,9 @@ export class Camera {
       this.view.scale += (target.scale - this.view.scale) * LERP;
     }
 
-    this.width = width;
-    this.height = height;
+    // Center of the uncovered region, in canvas pixels.
+    this.originX = inset.left + availW / 2;
+    this.originY = inset.top + availH / 2;
   }
 
   get ready() {
@@ -77,8 +87,8 @@ export class Camera {
   toPx(p) {
     const v = this.view;
     return {
-      x: this.width / 2 + (p.x - v.cx) * v.scale,
-      y: this.height / 2 - (p.y - v.cy) * v.scale,
+      x: this.originX + (p.x - v.cx) * v.scale,
+      y: this.originY - (p.y - v.cy) * v.scale,
     };
   }
 }

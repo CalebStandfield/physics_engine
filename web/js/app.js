@@ -9,6 +9,7 @@ import { buildTabs, setActiveTab, setCaption } from "./ui/topbar.js";
 import { buildControls, buildSolver } from "./ui/controls.js";
 import { buildLegend } from "./ui/legend.js";
 import { Readout } from "./ui/readout.js";
+import { overlayInset } from "./ui/inset.js";
 
 const el = (id) => document.getElementById(id);
 
@@ -57,6 +58,8 @@ async function main() {
 
   el("boot").classList.add("hidden");
 
+  const overlays = [...document.querySelectorAll(".panel, .transport, .caption")];
+
   let last = performance.now();
   const frame = (now) => {
     const elapsed = (now - last) / 1000;
@@ -67,7 +70,7 @@ async function main() {
     // Paused frames still redraw, so slider changes show up immediately.
     const snap = sim.snap;
     const mass = sim.getParam("mass");
-    scene.draw(snap.frame, mass);
+    scene.draw(snap.frame, mass, overlayInset(el("scene"), overlays));
     fbd.draw(snap.frame.forces);
     buildLegend(el("legend"), snap.frame);
     readout.update(sim);

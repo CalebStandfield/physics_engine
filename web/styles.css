@@ -172,18 +172,35 @@ body {
   overflow-y: auto;
 }
 
-.panel-legend {
+/* Right column: legend pinned to the top, the diagram floating below it in
+   whatever room is left. Stacked rather than absolutely placed so a long
+   readout can never cover the legend. */
+.col-right {
+  position: absolute;
+  z-index: 20;
   right: 20px;
   top: 20px;
-  width: 230px;
+  bottom: 20px;
+  width: 290px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  pointer-events: none;
+}
+
+.col-right > .panel {
+  position: static;
+  pointer-events: auto;
+}
+
+.panel-legend {
+  flex: none;
 }
 
 .panel-fbd {
-  right: 20px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 290px;
-  max-height: calc(100% - 40px);
+  margin-top: auto;
+  margin-bottom: auto;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -282,9 +299,11 @@ body {
 .ctl-label {
   color: var(--text);
   font-size: 12px;
+  line-height: 1.5;
 }
 
 .ctl-tag {
+  white-space: nowrap;
   color: var(--muted);
   font-size: 10px;
   letter-spacing: 0.08em;
