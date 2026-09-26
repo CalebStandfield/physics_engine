@@ -1,0 +1,363 @@
+//! Block hanging from a vertical spring.
+//!
+//! Coordinate: `x` is the spring's stretch past its natural length, in meters,
+//! measured downward. So the axis points down (world `-y`), the anchor sits at
+//! the world origin, and the block hangs at `y = -(L0 + x)`.
+//!
+//! Forces along that axis:
+//!   weight   = +m g        (down, along the axis)
+//!   spring   = -k x        (Hooke's law, pulls back toward natural length)
+//!   damping  = -b v        (air drag / internal loss, zero by default)
+//!
+//! so the net force is `F = m g - k x - b v`, which is zero at the equilibrium
+//! stretch `x0 = m g / k`. Writing `u = x - x0` turns that into `F = -k u`, the
+//! plain Hooke's-law oscillator, with period `T = 2 pi sqrt(m / k)`.
+
+use physics_core::math::Vec2;
+use physics_core::param;
+use physics_core::params::{self, ParamDef, ParamError, ParamSpec};
+use physics_core::scenario::{Derived, ForceVector, Frame, Guide, Scenario};
+use physics_core::state::State;
+
+/// Tunable inputs, all SI.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct SpringParams {
+    /// Hanging mass, kg.
+    pub mass: f64,
+    /// Spring constant, N/m.
+    pub stiffness: f64,
+    /// Unstretched spring length, m. Geometry only, it does not affect motion.
+    pub natural_length: f64,
+    /// How far the block is pulled past equilibrium to start, m. Positive is
+    /// further down.
+    pub initial_displacement: f64,
+    /// Starting velocity, m/s, positive downward.
+    pub initial_velocity: f64,
+    /// Linear damping, N per m/s. Zero is an ideal frictionless spring.
+    pub damping: f64,
+    /// Gravitational field strength, m/s^2.
+    pub gravity: f64,
+}
+
+fn defs() -> Vec<ParamDef<SpringParams>> {
+    vec![
+        param!(SpringParams, mass, "mass", "Mass", "kg", 0.01, 20.0, 0.25, 0.01),
+        param!(SpringParams, stiffness, "stiffness", "Spring constant", "N/m", 0.1, 500.0, 20.0, 0.1),
+        param!(SpringParams, natural_length, "natural_length", "Natural length", "m", 0.02, 2.0, 0.30, 0.01),
+        param!(SpringParams, initial_displacement, "initial_displacement", "Initial pull past equilibrium", "m", -0.5, 0.5, 0.05, 0.005),
+        param!(SpringParams, initial_velocity, "initial_velocity", "Initial velocity (down +)", "m/s", -5.0, 5.0, 0.0, 0.01),
+        param!(SpringParams, damping, "damping", "Damping", "N s/m", 0.0, 20.0, 0.0, 0.01),
+        param!(SpringParams, gravity, "gravity", "Gravity", "m/s^2", 0.1, 30.0, physics_core::G, 0.01),
+    ]
+}
+
+/// Mass on a vertical spring.
+pub struct SpringScenario {
+    params: SpringParams,
+    defs: Vec<ParamDef<SpringParams>>,
+}
+
+impl SpringScenario {
+    pub fn new() -> Self {
+        let defs = defs();
+        let params = params::defaults(&defs);
+        Self { params, defs }
+    }
+
+    pub fn params(&self) -> SpringParams {
+        self.params
+    }
+
+    /// Stretch at which the spring force balances the weight, m.
+    pub fn equilibrium_stretch(&self) -> f64 {
+        self.params.mass * self.params.gravity / self.params.stiffness
+    }
+
+    /// Ideal period of an undamped massless spring, `T = 2 pi sqrt(m / k)`, s.
+    pub fn ideal_period(&self) -> f64 {
+        std::f64::consts::TAU * (self.params.mass / self.params.stiffness).sqrt()
+    }
+
+    /// `b / (2 sqrt(m k))`. Below 1 the block still oscillates.
+    pub fn damping_ratio(&self) -> f64 {
+        self.params.damping / (2.0 * (self.params.mass * self.params.stiffness).sqrt())
+    }
+
+    /// Spring force along the axis (down positive): `-k x`, N.
+    fn spring_force(&self, x: f64) -> f64 {
+        -self.params.stiffness * x
+    }
+
+    /// Weight along the axis (down positive): `+m g`, N.
+    fn weight(&self) -> f64 {
+        self.params.mass * self.params.gravity
+    }
+
+    /// Damping force along the axis: `-b v`, N.
+    fn damping_force(&self, v: f64) -> f64 {
+        -self.params.damping * v
+    }
+
+    /// World position of the block for a given stretch.
+    fn body_position(&self, x: f64) -> Vec2 {
+        Vec2::new(0.0, -(self.params.natural_length + x))
+    }
+}
+
+impl Default for SpringScenario {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Down. Positive `State::x` moves the block this way.
+const AXIS: Vec2 = Vec2::new(0.0, -1.0);
+
+impl Scenario for SpringScenario {
+    fn id(&self) -> &'static str {
+        "spring"
+    }
+
+    fn name(&self) -> &'static str {
+        "Block hanging from a spring"
+    }
+
+    fn description(&self) -> &'static str {
+        "A block hangs from a vertical spring. Gravity pulls it down, the spring pulls it \
+         back, and the block oscillates about the stretch where those two balance."
+    }
+
+    fn coordinate_label(&self) -> &'static str {
+        "Stretch past natural length (down +)"
+    }
+
+    fn schema(&self) -> Vec<ParamSpec> {
+        params::specs(&self.defs)
+    }
+
+    fn get_param(&self, key: &str) -> Option<f64> {
+        params::get(&self.defs, &self.params, key)
+    }
+
+    fn set_param(&mut self, key: &str, value: f64) -> Result<(), ParamError> {
+        params::set(&self.defs, &mut self.params, key, value)
+    }
+
+    fn mass(&self) -> f64 {
+        self.params.mass
+    }
+
+    fn initial_state(&self) -> State {
+        State::new(
+            0.0,
+            self.equilibrium_stretch() + self.params.initial_displacement,
+            self.params.initial_velocity,
+        )
+    }
+
+    fn net_force(&self, x: f64, v: f64, _t: f64) -> f64 {
+        self.weight() + self.spring_force(x) + self.damping_force(v)
+    }
+
+    fn dissipated_power(&self, state: &State) -> f64 {
+        // |(-b v) * v| = b v^2.
+        self.params.damping * state.v * state.v
+    }
+
+    fn equilibrium(&self) -> Option<f64> {
+        Some(self.equilibrium_stretch())
+    }
+
+    fn frame(&self, state: &State) -> Frame {
+        let mut forces = vec![
+            ForceVector::new("Weight", "gravity", AXIS * self.weight()),
+            ForceVector::new("Spring force", "spring", AXIS * self.spring_force(state.x)),
+        ];
+        if self.params.damping > 0.0 {
+            forces.push(ForceVector::new(
+                "Damping",
+                "damping",
+                AXIS * self.damping_force(state.v),
+            ));
+        }
+
+        let half = 0.12;
+        let natural_y = -self.params.natural_length;
+        let equilibrium_y = -(self.params.natural_length + self.equilibrium_stretch());
+        let guides = vec![
+            Guide::new(
+                "Ceiling",
+                "anchor",
+                vec![Vec2::new(-half * 1.5, 0.0), Vec2::new(half * 1.5, 0.0)],
+            ),
+            Guide::new(
+                "Natural length",
+                "reference",
+                vec![
+                    Vec2::new(-half, natural_y),
+                    Vec2::new(half, natural_y),
+                ],
+            ),
+            Guide::new(
+                "Equilibrium",
+                "reference",
+                vec![
+                    Vec2::new(-half, equilibrium_y),
+                    Vec2::new(half, equilibrium_y),
+                ],
+            ),
+            Guide::new(
+                "Spring",
+                "spring",
+                vec![Vec2::ZERO, self.body_position(state.x)],
+            ),
+        ];
+
+        Frame {
+            body: self.body_position(state.x),
+            axis: AXIS,
+            forces,
+            guides,
+        }
+    }
+
+    fn derived(&self, state: &State) -> Vec<Derived> {
+        let m = self.params.mass;
+        let k = self.params.stiffness;
+        let x0 = self.equilibrium_stretch();
+        let kinetic = state.kinetic_energy(m);
+        let spring_pe = 0.5 * k * state.x * state.x;
+        // Height measured from the anchor, so the block's y is negative.
+        let grav_pe = m * self.params.gravity * self.body_position(state.x).y;
+
+        let mut out = vec![
+            Derived::new("equilibrium_stretch", "Equilibrium stretch", "m", x0),
+            Derived::new(
+                "displacement",
+                "Displacement from equilibrium",
+                "m",
+                state.x - x0,
+            ),
+            Derived::new("ideal_period", "Ideal period", "s", self.ideal_period()),
+            Derived::new(
+                "spring_force",
+                "Spring force",
+                "N",
+                self.spring_force(state.x),
+            ),
+            Derived::new("weight", "Weight", "N", self.weight()),
+            Derived::new("kinetic_energy", "Kinetic energy", "J", kinetic),
+            Derived::new("spring_energy", "Spring energy", "J", spring_pe),
+            Derived::new("gravitational_energy", "Gravitational energy", "J", grav_pe),
+            Derived::new(
+                "mechanical_energy",
+                "Total mechanical energy",
+                "J",
+                kinetic + spring_pe + grav_pe,
+            ),
+        ];
+
+        if self.params.damping > 0.0 {
+            out.push(Derived::new(
+                "damping_ratio",
+                "Damping ratio",
+                "",
+                self.damping_ratio(),
+            ));
+        }
+        out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use physics_core::sim::Simulation;
+
+    fn spring(mass: f64, stiffness: f64) -> SpringScenario {
+        let mut s = SpringScenario::new();
+        s.set_param("mass", mass).unwrap();
+        s.set_param("stiffness", stiffness).unwrap();
+        s
+    }
+
+    #[test]
+    fn equilibrium_is_where_weight_balances_the_spring() {
+        let s = spring(0.25, 20.0);
+        let x0 = s.equilibrium_stretch();
+        assert!((x0 - 0.25 * physics_core::G / 20.0).abs() < 1e-12);
+        assert!(s.net_force(x0, 0.0, 0.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn released_at_equilibrium_it_stays_put() {
+        let mut s = spring(0.25, 20.0);
+        s.set_param("initial_displacement", 0.0).unwrap();
+        let mut sim = Simulation::new(Box::new(s));
+        sim.run_for(3.0);
+        let x0 = SpringScenario::new().equilibrium_stretch();
+        assert!((sim.state().x - x0).abs() < 1e-6);
+        assert!(sim.state().v.abs() < 1e-6);
+    }
+
+    #[test]
+    fn undamped_motion_repeats_after_one_ideal_period() {
+        let s = spring(0.25, 20.0);
+        let period = s.ideal_period();
+        let start = s.initial_state();
+        let mut sim = Simulation::new(Box::new(s));
+        sim.set_dt(1e-5);
+        sim.run_for(period);
+        assert!((sim.state().x - start.x).abs() < 1e-4, "x drifted");
+        assert!((sim.state().v - start.v).abs() < 1e-3, "v drifted");
+    }
+
+    #[test]
+    fn damping_settles_the_block_at_equilibrium() {
+        let mut s = spring(0.25, 20.0);
+        s.set_param("damping", 3.0).unwrap();
+        let x0 = s.equilibrium_stretch();
+        let mut sim = Simulation::new(Box::new(s));
+        sim.run_for(20.0);
+        assert!((sim.state().x - x0).abs() < 1e-4);
+        assert!(sim.state().v.abs() < 1e-4);
+        assert!(sim.energy_lost() > 0.0, "damping should remove energy");
+    }
+
+    #[test]
+    fn undamped_mechanical_energy_holds() {
+        let s = spring(0.25, 20.0);
+        let energy = |sim: &Simulation| {
+            sim.snapshot()
+                .derived
+                .iter()
+                .find(|d| d.key == "mechanical_energy")
+                .unwrap()
+                .value
+        };
+        let mut sim = Simulation::new(Box::new(s));
+        let before = energy(&sim);
+        sim.run_for(10.0);
+        let after = energy(&sim);
+        assert!((after - before).abs() < 1e-3, "{before} -> {after}");
+    }
+
+    #[test]
+    fn drawn_forces_add_up_to_the_net_force() {
+        let mut s = spring(0.4, 35.0);
+        s.set_param("damping", 1.2).unwrap();
+        let state = State::new(0.0, 0.2, -0.7);
+        let frame = s.frame(&state);
+        let scalar = s.net_force(state.x, state.v, state.t);
+        assert!((frame.net_force() - AXIS * scalar).len() < 1e-12);
+        assert_eq!(frame.forces.len(), 3);
+    }
+
+    #[test]
+    fn schema_defaults_round_trip() {
+        let s = SpringScenario::new();
+        for spec in s.schema() {
+            assert_eq!(s.get_param(spec.key), Some(spec.default), "{}", spec.key);
+        }
+    }
+}
