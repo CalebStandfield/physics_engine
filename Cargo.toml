@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/physics-core",
+    "crates/physics-scenarios",
+    "crates/physics-wasm",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+physics-core = { path = "crates/physics-core" }
+physics-scenarios = { path = "crates/physics-scenarios" }
+serde = { version = "1", features = ["derive"] }

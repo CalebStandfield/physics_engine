@@ -1,0 +1,10 @@
+[package]
+name = "physics-scenarios"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Concrete scenarios (spring, incline) plugged into physics-core."
+
+[dependencies]
+physics-core = { workspace = true }
+serde = { workspace = true }

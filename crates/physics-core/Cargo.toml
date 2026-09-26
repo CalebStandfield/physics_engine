@@ -1,0 +1,9 @@
+[package]
+name = "physics-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Scenario-agnostic simulation core: vectors, state, integrators, scenario trait."
+
+[dependencies]
+serde = { workspace = true }
