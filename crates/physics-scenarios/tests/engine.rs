@@ -183,18 +183,27 @@ fn every_scenario_draws_forces_that_match_its_net_force() {
 
 #[test]
 fn parameter_ranges_are_all_survivable() {
+    // Pairs, not one slider at a time: the combinations are where the stiff
+    // cases live (a light mass together with heavy damping, say).
     for id in registry::ids() {
-        for spec in registry::create(id).unwrap().schema() {
-            for value in [spec.min, spec.default, spec.max] {
-                let mut s = registry::create(id).unwrap();
-                s.set_param(spec.key, value).unwrap();
-                let mut sim = Simulation::new(s);
-                sim.run_for(3.0);
-                assert!(
-                    sim.state().is_finite(),
-                    "{id} diverged at {} = {value}",
-                    spec.key
-                );
+        let schema = registry::create(id).unwrap().schema();
+        for (i, first) in schema.iter().enumerate() {
+            for second in schema.iter().skip(i + 1) {
+                for a in [first.min, first.max] {
+                    for b in [second.min, second.max] {
+                        let mut s = registry::create(id).unwrap();
+                        s.set_param(first.key, a).unwrap();
+                        s.set_param(second.key, b).unwrap();
+                        let mut sim = Simulation::new(s);
+                        sim.run_for(0.5);
+                        assert!(
+                            sim.state().is_finite(),
+                            "{id} diverged at {} = {a}, {} = {b}",
+                            first.key,
+                            second.key
+                        );
+                    }
+                }
             }
         }
     }
@@ -211,4 +220,112 @@ fn recording_is_thinned_and_ordered() {
     assert_eq!(samples.len(), 101, "100 kept steps plus the initial state");
     assert!(samples.windows(2).all(|w| w[1].t >= w[0].t), "out of order");
     assert_eq!(sim.recorder().to_flat().len(), samples.len() * 3);
+}
+
+#[test]
+fn a_block_at_rest_never_gets_pushed_backwards_by_friction() {
+    // mu_k above mu_s is unusual but the sliders allow it. Friction on a
+    // stationary block can cancel the drive, not reverse it.
+    let mut s = InclineScenario::new();
+    s.set_param("angle_deg", 30.0).unwrap();
+    s.set_param("mu_static", 0.10).unwrap();
+    s.set_param("mu_kinetic", 1.50).unwrap();
+    s.set_param("initial_position", 1.0).unwrap();
+    assert!(!s.holds_at_rest(), "static friction should be too weak here");
+    assert!(
+        s.net_force(1.0, 0.0, 0.0) >= 0.0,
+        "downhill gravity must not produce an uphill net force"
+    );
+
+    let mut sim = Simulation::new(Box::new(s));
+    sim.run_for(2.0);
+    assert!(sim.state().x >= 1.0 - 1e-9, "block crept uphill");
+    assert!(sim.state().v >= -1e-9, "block picked up uphill velocity");
+}
+
+#[test]
+fn stiff_and_heavily_damped_springs_stay_finite_at_the_default_step() {
+    // A light mass on heavy damping is stiff enough to blow up plain Euler at
+    // the default step, so the driver has to subdivide.
+    for (mass, damping, stiffness) in [
+        (0.01, 20.0, 0.1),
+        (0.01, 20.0, 500.0),
+        (0.01, 0.0, 500.0),
+        (20.0, 20.0, 500.0),
+    ] {
+        for integ in integrator::all() {
+            let integ_id = integ.id();
+            let mut s = SpringScenario::new();
+            s.set_param("mass", mass).unwrap();
+            s.set_param("damping", damping).unwrap();
+            s.set_param("stiffness", stiffness).unwrap();
+
+            let mut sim = Simulation::new(Box::new(s));
+            sim.set_integrator(integ);
+            sim.run_for(3.0);
+            assert!(
+                sim.state().is_finite(),
+                "m={mass} b={damping} k={stiffness} diverged under {integ_id}"
+            );
+        }
+    }
+}
+
+#[test]
+fn subdividing_does_not_change_the_simulated_clock() {
+    let mut s = SpringScenario::new();
+    s.set_param("mass", 0.01).unwrap();
+    s.set_param("stiffness", 500.0).unwrap();
+    let mut sim = Simulation::new(Box::new(s));
+    sim.set_dt(0.01);
+    assert!(sim.subdivisions() > 1, "this setup should need subdividing");
+
+    sim.step_n(100);
+    assert_eq!(sim.steps(), 100);
+    assert!((sim.state().t - 1.0).abs() < 1e-12, "clock drifted");
+}
+
+#[test]
+fn stopping_at_the_end_of_the_ramp_is_booked_as_energy_lost() {
+    let mut s = InclineScenario::new();
+    s.set_param("angle_deg", 40.0).unwrap();
+    s.set_param("mu_static", 0.10).unwrap();
+    s.set_param("mu_kinetic", 0.05).unwrap();
+    s.set_param("length", 1.0).unwrap();
+    let mass = s.params().mass;
+    let gravity = s.params().gravity;
+    let drop = s.angle().sin() * 1.0;
+
+    let mut sim = Simulation::new(Box::new(s));
+    sim.set_dt(1e-5);
+    sim.run_for(2.0);
+    assert_eq!(sim.state().v, 0.0, "block should be stopped at the end");
+
+    // Everything gravity released over the ramp ended up in the loss ledger.
+    let released = mass * gravity * drop;
+    assert!(
+        percent_difference(sim.energy_lost(), released) < 0.5,
+        "lost {} J of {released} J released",
+        sim.energy_lost()
+    );
+}
+
+#[test]
+fn a_damped_spring_oscillates_at_its_damped_period() {
+    let mut s = SpringScenario::new();
+    s.set_param("mass", 0.25).unwrap();
+    s.set_param("stiffness", 20.0).unwrap();
+    s.set_param("damping", 0.5).unwrap();
+    s.set_param("initial_displacement", 0.05).unwrap();
+    let undamped = s.ideal_period();
+    let damped = s.damped_period().unwrap();
+    assert!(damped > undamped, "damping should stretch the period");
+
+    let mut sim = Simulation::new(Box::new(s));
+    sim.run_for(10.0 * damped);
+    let measured = sim.measured_period().unwrap();
+    assert!(
+        percent_difference(measured, damped) < 1.0,
+        "{measured} s vs {damped} s"
+    );
 }

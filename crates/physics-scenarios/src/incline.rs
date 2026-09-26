@@ -161,7 +161,11 @@ impl InclineScenario {
             -self.drive_force()
         } else {
             // Breaking loose: it starts sliding the way the drive points.
-            -self.drive_force().signum() * self.kinetic_friction()
+            // Friction on a body at rest can only cancel the drive, never
+            // overpower it, so cap it there. Without the cap a setup with
+            // mu_k > mu_s would push the block backwards out of rest.
+            let drive = self.drive_force();
+            -drive.signum() * self.kinetic_friction().min(drive.abs())
         }
     }
 
@@ -280,8 +284,8 @@ impl Scenario for InclineScenario {
         let corner = Vec2::new(bottom.x, top.y);
         let guides = vec![
             Guide::new("Slope", "surface", vec![top, bottom]),
-            Guide::new("Ground", "surface", vec![bottom, corner]),
-            Guide::new("Rise", "reference", vec![corner, top]),
+            Guide::new("Rise", "reference", vec![bottom, corner]),
+            Guide::new("Run", "reference", vec![corner, top]),
             Guide::new(
                 "Slope direction",
                 "axis",

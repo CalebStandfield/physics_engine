@@ -74,9 +74,10 @@ pub fn percent_difference(a: f64, b: f64) -> f64 {
     analysis::percent_difference(a, b)
 }
 
-/// Percent error of a measurement against an accepted value.
+/// Percent error of a measurement against an accepted value. Undefined, and so
+/// undefined in JS too, when the accepted value is zero.
 #[wasm_bindgen]
-pub fn percent_error(measured: f64, accepted: f64) -> f64 {
+pub fn percent_error(measured: f64, accepted: f64) -> Option<f64> {
     analysis::percent_error(measured, accepted)
 }
 

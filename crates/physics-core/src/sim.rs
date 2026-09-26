@@ -13,6 +13,10 @@ use crate::system::System;
 /// several substeps per frame.
 pub const DEFAULT_DT: f64 = 1.0 / 480.0;
 
+/// Ceiling on how far one fixed step may be subdivided for stability. Bounds
+/// the cost of an extreme parameter combination.
+pub const MAX_SUBDIVISIONS: usize = 256;
+
 /// Ceiling on substeps per `advance` call, so a stalled tab that reports a huge
 /// elapsed time cannot lock the engine up trying to catch up.
 pub const MAX_SUBSTEPS: usize = 2000;
@@ -171,19 +175,45 @@ impl Simulation {
         self.detector.as_ref().map_or(0, |d| d.cycles())
     }
 
+    /// How many pieces one fixed step is cut into to stay stable. Usually 1.
+    pub fn subdivisions(&self) -> usize {
+        match self.scenario.max_stable_dt() {
+            Some(limit) if limit > 0.0 && limit < self.dt => {
+                ((self.dt / limit).ceil() as usize).clamp(1, MAX_SUBDIVISIONS)
+            }
+            _ => 1,
+        }
+    }
+
     /// One fixed step. The integrator moves the state, then the scenario gets
     /// to enforce anything the force law could not express.
+    ///
+    /// The step is cut into equal pieces if the scenario says the full one
+    /// would be unstable, so a step is always exactly `dt` of simulated time
+    /// no matter what the parameters are.
     pub fn step(&mut self) {
         let dt = self.dt;
-        let mut next = {
-            let system = ScenarioSystem(&*self.scenario);
-            self.integrator.step(&system, &self.state, dt)
-        };
-        self.scenario.constrain(&self.state, &mut next);
+        let pieces = self.subdivisions();
+        let h = dt / pieces as f64;
+        let mass = self.scenario.mass();
+        let before = self.state;
 
-        // Friction and damping are path-dependent, so the loss is accumulated
-        // here rather than recomputed from the state.
-        self.energy_lost += self.scenario.dissipated_power(&self.state) * dt;
+        let mut next = self.state;
+        for _ in 0..pieces {
+            // Friction and damping are path-dependent, so the loss is
+            // accumulated as the body moves rather than recomputed from the
+            // state afterwards.
+            self.energy_lost += self.scenario.dissipated_power(&next) * h;
+            let system = ScenarioSystem(&*self.scenario);
+            next = self.integrator.step(&system, &next, h);
+        }
+
+        // Constraints only ever take energy out (a block hitting the end of a
+        // ramp, static friction parking one that just stopped), so whatever
+        // kinetic energy they remove belongs in the same ledger.
+        let kinetic_before = next.kinetic_energy(mass);
+        self.scenario.constrain(&before, &mut next);
+        self.energy_lost += (kinetic_before - next.kinetic_energy(mass)).max(0.0);
 
         self.state = next;
         self.steps += 1;

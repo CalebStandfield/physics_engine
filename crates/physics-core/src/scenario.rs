@@ -159,6 +159,17 @@ pub trait Scenario {
         0.0
     }
 
+    /// Largest step this scenario can be integrated with before the explicit
+    /// schemes go unstable, seconds. `None` means any step is fine.
+    ///
+    /// A stiff spring or heavy damping can blow up at a step that is perfectly
+    /// comfortable for everything else, and the parameters are user-facing
+    /// sliders, so the scenario reports its own limit and the driver quietly
+    /// subdivides to respect it.
+    fn max_stable_dt(&self) -> Option<f64> {
+        None
+    }
+
     /// Position the oscillation detector should measure crossings about, in
     /// scenario coordinates. `None` for a system that does not oscillate.
     fn equilibrium(&self) -> Option<f64> {

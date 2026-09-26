@@ -21,11 +21,14 @@ pub fn percent_difference(a: f64, b: f64) -> f64 {
 
 /// Percent error of a measurement against a value taken as correct:
 /// `|measured - accepted| / |accepted| * 100`.
-pub fn percent_error(measured: f64, accepted: f64) -> f64 {
+///
+/// `None` when the accepted value is zero, since percent error is not defined
+/// there. Reporting 0% would read as perfect agreement.
+pub fn percent_error(measured: f64, accepted: f64) -> Option<f64> {
     if accepted == 0.0 {
-        0.0
+        None
     } else {
-        (measured - accepted).abs() / accepted.abs() * 100.0
+        Some((measured - accepted).abs() / accepted.abs() * 100.0)
     }
 }
 
@@ -184,8 +187,8 @@ mod tests {
 
     #[test]
     fn percent_error_is_relative_to_the_accepted_value() {
-        assert!((percent_error(1.05, 1.0) - 5.0).abs() < 1e-12);
-        assert_eq!(percent_error(1.0, 0.0), 0.0);
+        assert!((percent_error(1.05, 1.0).unwrap() - 5.0).abs() < 1e-12);
+        assert!(percent_error(1.0, 0.0).is_none());
     }
 
     /// A clean sine wave sampled far more finely than its period.

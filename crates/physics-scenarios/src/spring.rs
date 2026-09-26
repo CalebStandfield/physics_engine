@@ -78,6 +78,23 @@ impl SpringScenario {
         std::f64::consts::TAU * (self.params.mass / self.params.stiffness).sqrt()
     }
 
+    /// Undamped angular frequency `sqrt(k / m)`, rad/s.
+    pub fn angular_frequency(&self) -> f64 {
+        (self.params.stiffness / self.params.mass).sqrt()
+    }
+
+    /// Period the block actually oscillates at once damping is included,
+    /// `T / sqrt(1 - z^2)`, s. `None` once damping is strong enough that it
+    /// stops oscillating at all.
+    pub fn damped_period(&self) -> Option<f64> {
+        let z = self.damping_ratio();
+        if z < 1.0 {
+            Some(self.ideal_period() / (1.0 - z * z).sqrt())
+        } else {
+            None
+        }
+    }
+
     /// `b / (2 sqrt(m k))`. Below 1 the block still oscillates.
     pub fn damping_ratio(&self) -> f64 {
         self.params.damping / (2.0 * (self.params.mass * self.params.stiffness).sqrt())
@@ -164,6 +181,18 @@ impl Scenario for SpringScenario {
         self.params.damping * state.v * state.v
     }
 
+    fn max_stable_dt(&self) -> Option<f64> {
+        // Explicit schemes need the step under 2 / omega for the spring, and
+        // under 2 m / b for the damping. Half that, for margin.
+        let by_stiffness = 2.0 / self.angular_frequency();
+        let limit = if self.params.damping > 0.0 {
+            by_stiffness.min(2.0 * self.params.mass / self.params.damping)
+        } else {
+            by_stiffness
+        };
+        Some(0.5 * limit)
+    }
+
     fn equilibrium(&self) -> Option<f64> {
         Some(self.equilibrium_stretch())
     }
@@ -238,7 +267,12 @@ impl Scenario for SpringScenario {
                 "m",
                 state.x - x0,
             ),
-            Derived::new("ideal_period", "Ideal period", "s", self.ideal_period()),
+            Derived::new(
+                "ideal_period",
+                "Ideal period (undamped)",
+                "s",
+                self.ideal_period(),
+            ),
             Derived::new(
                 "spring_force",
                 "Spring force",
@@ -264,6 +298,11 @@ impl Scenario for SpringScenario {
                 "",
                 self.damping_ratio(),
             ));
+            // Damping stretches the period, so the undamped formula is not
+            // what a stopwatch would read here.
+            if let Some(damped) = self.damped_period() {
+                out.push(Derived::new("damped_period", "Damped period", "s", damped));
+            }
         }
         out
     }
