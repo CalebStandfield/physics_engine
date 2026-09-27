@@ -4,14 +4,14 @@
 // idea which scenario is running, so a new scenario needs no change here.
 
 import { COLOR, guideStyle, forceStyle } from "../theme.js";
-import { polyline, hatch, arrow, roundedRect, label, fitCanvas } from "./draw.js";
+import { polyline, hatch, arrow, block, label, fitCanvas } from "./draw.js";
 import { coilPoints } from "./spring.js";
+import { borderWidth } from "./mass.js";
 
 // Painting order by guide kind. Lower draws first.
 const DEPTH = { reference: 0, surface: 1, anchor: 1, spring: 2, axis: 3 };
 
 const MAX_FORCE_PX = 110; // longest force arrow in the scene
-const REF_MASS = 1.0; // kg the body size is calibrated against
 
 // Room left around the geometry for force arrows and their labels.
 const ARROW_ROOM = MAX_FORCE_PX + 40;
@@ -58,9 +58,11 @@ export class SceneRenderer {
     this.camera = camera;
   }
 
-  // `mass` only sets how big the block looks; it changes no physics.
+  // `body` is `{ mass, range }`: the current mass and the slider range it came
+  // from, which together set how thick the block's border is drawn. Neither
+  // changes any physics.
   // `inset` is the area the overlay panels cover, in CSS pixels.
-  draw(frame, mass, inset) {
+  draw(frame, body, inset) {
     const { width, height } = fitCanvas(this.canvas, this.ctx);
     this.camera.observe(frame);
     this.camera.fit(width, height, pad(inset));
@@ -74,21 +76,28 @@ export class SceneRenderer {
     const center = px(frame.body);
     for (const guide of guides) this.drawGuide(guide, px, center);
 
-    const side = this.bodySize(width, height, mass);
-    roundedRect(this.ctx, center.x, center.y, side, side, 4, {
+    const side = this.bodySize(width, height);
+    const pose = frame.pose ?? { angle: 0, support: { x: 0, y: 0 } };
+
+    // The engine puts `body` on the surface the block rests on, so lift the
+    // drawn box off that line by half its height. Canvas y points down.
+    const seated = {
+      x: center.x + pose.support.x * (side / 2),
+      y: center.y - pose.support.y * (side / 2),
+    };
+
+    block(this.ctx, seated.x, seated.y, side, {
       fill: COLOR.bodyFill,
       stroke: COLOR.orange,
-      width: 2,
+      border: borderWidth(side, body.mass, body.range),
+      angle: -pose.angle,
     });
 
-    this.drawForces(frame.forces, center, side);
+    this.drawForces(frame.forces, seated, side);
   }
 
-  bodySize(width, height, mass) {
-    const base = Math.min(width, height) * 0.07;
-    const m = Number.isFinite(mass) && mass > 0 ? mass : REF_MASS;
-    const growth = Math.cbrt(m / REF_MASS);
-    return Math.max(18, Math.min(64, base * Math.max(0.6, Math.min(1.8, growth))));
+  bodySize(width, height) {
+    return Math.max(18, Math.min(64, Math.min(width, height) * 0.07));
   }
 
   drawGuide(guide, px, bodyPx) {

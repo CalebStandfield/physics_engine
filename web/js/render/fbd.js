@@ -5,7 +5,8 @@
 // numbers the engine handed us, not a physics decision made here.
 
 import { COLOR, forceStyle, NET_STYLE } from "../theme.js";
-import { arrow, roundedRect, label, fitCanvas } from "./draw.js";
+import { arrow, block, label, fitCanvas } from "./draw.js";
+import { borderWidth } from "./mass.js";
 
 const BODY = 26; // px
 const MARGIN = 46; // px kept clear for labels
@@ -17,15 +18,19 @@ export class FbdRenderer {
     this.ctx = canvas.getContext("2d");
   }
 
-  draw(forces) {
+  // `body` is the same `{ mass, range }` the scene gets, so the two blocks carry
+  // the same border. The diagram keeps the block axis-aligned: it is the body on
+  // its own, cut out of whatever it was sitting on.
+  draw(forces, body) {
     const { width, height } = fitCanvas(this.canvas, this.ctx);
     const cx = width / 2;
     const cy = height / 2;
 
-    roundedRect(this.ctx, cx, cy, BODY, BODY, 3, {
+    block(this.ctx, cx, cy, BODY, {
       fill: COLOR.bodyFill,
       stroke: COLOR.orange,
-      width: 2,
+      border: borderWidth(BODY, body.mass, body.range),
+      radius: 3,
     });
 
     const max = forces.reduce(

@@ -6,6 +6,7 @@
 // computed by the engine's `percent_difference`.
 
 import { num, unitSuffix } from "./format.js";
+import { ADVANCED, shows } from "./mode.js";
 
 const COMPARISONS = {
   spring: [
@@ -30,11 +31,19 @@ export class Readout {
     this.cells = new Map();
   }
 
-  update(sim) {
+  // Rows carry the same tier the controls do, so one switch trims both panels.
+  // The engine tiers its own derived rows; the ones added here say so inline.
+  update(sim, mode) {
     const rows = [
       { key: "_t", label: "Time", unit: "s", value: sim.snap.state.t },
       ...sim.snap.derived,
-      { key: "_lost", label: "Energy lost", unit: "J", value: sim.snap.energy_lost },
+      {
+        key: "_lost",
+        label: "Energy lost",
+        unit: "J",
+        value: sim.snap.energy_lost,
+        tier: ADVANCED,
+      },
     ];
 
     if (sim.snap.measured_period !== undefined) {
@@ -43,6 +52,7 @@ export class Readout {
         label: "Measured period",
         unit: "s",
         value: sim.snap.measured_period,
+        tier: ADVANCED,
       });
     }
 
@@ -55,10 +65,11 @@ export class Readout {
         label: cmp.label,
         unit: "%",
         value: sim.percentDifference(measured, predicted),
+        tier: ADVANCED,
       });
     }
 
-    this.render(rows);
+    this.render(rows.filter((r) => shows(mode, r.tier)));
   }
 
   render(rows) {

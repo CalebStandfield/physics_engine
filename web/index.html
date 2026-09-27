@@ -41,11 +41,14 @@
       </div>
 
       <section class="panel panel-controls">
+        <div class="mode" id="mode-controls"></div>
         <h2>Controls</h2>
         <div id="controls"></div>
-        <div class="divider"></div>
-        <h2>Solver</h2>
-        <div id="solver"></div>
+        <div id="solver-block">
+          <div class="divider"></div>
+          <h2>Solver</h2>
+          <div id="solver"></div>
+        </div>
       </section>
 
       <div class="col-right">
@@ -55,6 +58,7 @@
         </section>
 
         <section class="panel panel-fbd">
+          <div class="mode" id="mode-fbd"></div>
           <h2>Free body diagram</h2>
           <canvas id="fbd"></canvas>
           <div class="divider"></div>

@@ -68,11 +68,18 @@ export function arrow(ctx, from, to, { color, width = 2, dash = [], head = 8 }) 
   ctx.restore();
 }
 
-export function roundedRect(ctx, cx, cy, w, h, r, { fill, stroke, width = 2 }) {
+// `angle` is a canvas rotation about the center, radians, positive clockwise
+// (canvas y points down, so a world angle comes in negated).
+export function roundedRect(ctx, cx, cy, w, h, r, { fill, stroke, width = 2, angle = 0 }) {
   const x = cx - w / 2;
   const y = cy - h / 2;
   const rr = Math.min(r, w / 2, h / 2);
   ctx.save();
+  if (angle) {
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    ctx.translate(-cx, -cy);
+  }
   ctx.beginPath();
   ctx.moveTo(x + rr, y);
   ctx.arcTo(x + w, y, x + w, y + h, rr);
@@ -100,6 +107,21 @@ export function label(ctx, text, x, y, { color, align = "left", baseline = "midd
   ctx.textBaseline = baseline;
   ctx.fillText(text, x, y);
   ctx.restore();
+}
+
+// The block, drawn the same way in the scene and in the free body diagram.
+//
+// `border` is painted inward: an orange rect with a smaller fill-colored rect on
+// top of it, rather than a stroke. So a heavier block reads as a thicker border
+// without its footprint changing, and a border of `side / 2` is a solid orange
+// block with no fill left.
+export function block(ctx, cx, cy, side, { fill, stroke, border = 2, angle = 0, radius = 4 }) {
+  const b = Math.max(0, Math.min(border, side / 2));
+  roundedRect(ctx, cx, cy, side, side, radius, { fill: stroke, angle });
+  const inner = side - 2 * b;
+  if (inner > 0.5) {
+    roundedRect(ctx, cx, cy, inner, inner, Math.max(1, radius - b), { fill, angle });
+  }
 }
 
 // Resize a canvas to its CSS box at device resolution. Returns the CSS size,

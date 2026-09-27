@@ -10,6 +10,8 @@ import init, {
   percent_difference,
 } from "../pkg/physics_wasm.js";
 
+import { ParamMemory } from "./memory.js";
+
 const MAX_FRAME = 0.1; // s of real time fed to the engine in one go
 
 export class Sim {
@@ -18,6 +20,7 @@ export class Sim {
     this.catalog = catalog;
     this.integrators = integratorList;
     this.running = false;
+    this.memory = new ParamMemory();
     this.snap = engine.snapshot();
   }
 
@@ -39,13 +42,24 @@ export class Sim {
     return this.catalog.find((c) => c.id === this.id);
   }
 
+  // Swapping scenarios always leaves you paused: starting one scenario should
+  // not hand a running clock to the next one. Slider values are kept per
+  // scenario across the swap.
   loadScenario(id) {
+    this.memory.save(this.id, this);
     this.engine.loadScenario(id);
+    this.memory.restore(id, this);
+    this.running = false;
     this.refresh();
   }
 
   schema() {
     return this.engine.schema();
+  }
+
+  // One parameter's spec, for a panel that needs a range rather than a value.
+  spec(key) {
+    return this.schema().find((s) => s.key === key);
   }
 
   getParam(key) {

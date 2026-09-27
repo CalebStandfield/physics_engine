@@ -215,6 +215,44 @@ body {
   border-radius: 3px;
 }
 
+/* ---------- simple | advanced switch ---------- */
+
+/* One switch per panel, both driving the same mode. Sits above the panel's own
+   heading, so it reads as "how much of this panel do you want". */
+.mode {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 12px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.mode-btn {
+  appearance: none;
+  flex: 1;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 5px 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.mode-btn:hover {
+  color: var(--orange);
+}
+
+.mode-btn.active {
+  background: var(--orange);
+  color: #17120d;
+  font-weight: 600;
+}
+
 /* ---------- transport ---------- */
 
 .transport {
@@ -440,7 +478,7 @@ select:focus {
   color: var(--orange);
 }
 
-.boot.hidden {
+.hidden {
   display: none;
 }
 
