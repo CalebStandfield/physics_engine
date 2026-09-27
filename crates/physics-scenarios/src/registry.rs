@@ -50,6 +50,25 @@ mod tests {
         assert!(create("nope").is_none());
     }
 
+    // Every slider a scenario shows has to come out of the catalog, so two
+    // scenarios sharing a key share its range. Only the label and the default
+    // are allowed to differ.
+    #[test]
+    fn every_control_matches_the_catalog() {
+        for id in ids() {
+            let s = create(id).unwrap();
+            for spec in s.schema() {
+                let shared = crate::controls::control(spec.key);
+                assert_eq!(
+                    (spec.min, spec.max, spec.step, spec.unit, spec.tier),
+                    (shared.min, shared.max, shared.step, shared.unit, shared.tier),
+                    "{id}.{} drifted from the catalog",
+                    spec.key
+                );
+            }
+        }
+    }
+
     #[test]
     fn every_schema_default_round_trips() {
         for id in ids() {

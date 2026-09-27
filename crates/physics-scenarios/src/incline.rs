@@ -21,11 +21,13 @@
 //! `a = g (sin theta - mu_k cos theta)`, and it does not move at all while
 //! `tan(theta) <= mu_s`.
 
+use physics_core::bind;
 use physics_core::math::Vec2;
-use physics_core::param;
 use physics_core::params::{self, ParamDef, ParamError, ParamSpec};
 use physics_core::scenario::{Derived, ForceVector, Frame, Guide, Scenario};
 use physics_core::state::State;
+
+use crate::controls::control;
 
 /// Speeds under this count as at rest, m/s. Below it the static friction test
 /// applies instead of the kinetic one.
@@ -56,15 +58,19 @@ pub struct InclineParams {
 
 fn defs() -> Vec<ParamDef<InclineParams>> {
     vec![
-        param!(InclineParams, mass, "mass", "Mass", "kg", 0.01, 100.0, 1.5, 0.01),
-        param!(InclineParams, angle_deg, "angle_deg", "Incline angle", "deg", 0.0, 89.0, 25.0, 0.5),
-        param!(InclineParams, mu_static, "mu_static", "Static friction coefficient", "", 0.0, 2.0, 0.35, 0.01),
-        param!(InclineParams, mu_kinetic, "mu_kinetic", "Kinetic friction coefficient", "", 0.0, 2.0, 0.25, 0.01),
-        param!(InclineParams, length, "length", "Ramp length", "m", 0.1, 20.0, 2.0, 0.05),
-        param!(InclineParams, initial_position, "initial_position", "Start distance from top", "m", 0.0, 20.0, 0.0, 0.05),
-        param!(InclineParams, initial_velocity, "initial_velocity", "Initial velocity (downhill +)", "m/s", -10.0, 10.0, 0.0, 0.05),
-        param!(InclineParams, applied_force, "applied_force", "Applied force along slope", "N", -200.0, 200.0, 0.0, 0.5),
-        param!(InclineParams, gravity, "gravity", "Gravity", "m/s^2", 0.1, 30.0, physics_core::G, 0.01),
+        bind!(InclineParams, mass, control("mass").with_default(1.5)),
+        bind!(InclineParams, angle_deg, control("angle_deg")),
+        bind!(InclineParams, mu_static, control("mu_static")),
+        bind!(InclineParams, mu_kinetic, control("mu_kinetic")),
+        bind!(InclineParams, length, control("length")),
+        bind!(InclineParams, initial_position, control("initial_position")),
+        bind!(
+            InclineParams,
+            initial_velocity,
+            control("initial_velocity").with_label("Initial velocity (downhill +)")
+        ),
+        bind!(InclineParams, applied_force, control("applied_force")),
+        bind!(InclineParams, gravity, control("gravity")),
     ]
 }
 

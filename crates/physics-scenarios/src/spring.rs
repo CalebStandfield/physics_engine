@@ -13,11 +13,13 @@
 //! stretch `x0 = m g / k`. Writing `u = x - x0` turns that into `F = -k u`, the
 //! plain Hooke's-law oscillator, with period `T = 2 pi sqrt(m / k)`.
 
+use physics_core::bind;
 use physics_core::math::Vec2;
-use physics_core::param;
 use physics_core::params::{self, ParamDef, ParamError, ParamSpec};
 use physics_core::scenario::{Derived, ForceVector, Frame, Guide, Scenario};
 use physics_core::state::State;
+
+use crate::controls::control;
 
 /// Tunable inputs, all SI.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -41,13 +43,17 @@ pub struct SpringParams {
 
 fn defs() -> Vec<ParamDef<SpringParams>> {
     vec![
-        param!(SpringParams, mass, "mass", "Mass", "kg", 0.01, 20.0, 0.25, 0.01),
-        param!(SpringParams, stiffness, "stiffness", "Spring constant", "N/m", 0.1, 500.0, 20.0, 0.1),
-        param!(SpringParams, natural_length, "natural_length", "Natural length", "m", 0.02, 2.0, 0.30, 0.01),
-        param!(SpringParams, initial_displacement, "initial_displacement", "Initial pull past equilibrium", "m", -0.5, 0.5, 0.05, 0.005),
-        param!(SpringParams, initial_velocity, "initial_velocity", "Initial velocity (down +)", "m/s", -5.0, 5.0, 0.0, 0.01),
-        param!(SpringParams, damping, "damping", "Damping", "N s/m", 0.0, 20.0, 0.0, 0.01),
-        param!(SpringParams, gravity, "gravity", "Gravity", "m/s^2", 0.1, 30.0, physics_core::G, 0.01),
+        bind!(SpringParams, mass, control("mass").with_default(0.25)),
+        bind!(SpringParams, stiffness, control("stiffness")),
+        bind!(SpringParams, natural_length, control("natural_length")),
+        bind!(SpringParams, initial_displacement, control("initial_displacement")),
+        bind!(
+            SpringParams,
+            initial_velocity,
+            control("initial_velocity").with_label("Initial velocity (down +)")
+        ),
+        bind!(SpringParams, damping, control("damping")),
+        bind!(SpringParams, gravity, control("gravity")),
     ]
 }
 

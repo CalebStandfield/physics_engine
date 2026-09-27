@@ -6,6 +6,15 @@
 
 use serde::{Deserialize, Serialize};
 
+/// How prominent a control is. A UI showing a short panel shows the `Basic`
+/// ones; `Advanced` is the rest of the knobs, for whoever wants them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Tier {
+    Basic,
+    Advanced,
+}
+
 /// Everything a UI needs to render one input, and the engine needs to validate
 /// it. Const-constructible so scenarios can declare their table as a `static`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -24,6 +33,24 @@ pub struct ParamSpec {
     pub default: f64,
     /// Suggested slider increment.
     pub step: f64,
+    /// Whether a simple panel should show this one.
+    pub tier: Tier,
+}
+
+impl ParamSpec {
+    /// Same control, different starting value. Scenarios share a range but
+    /// usually want their own default.
+    pub const fn with_default(mut self, default: f64) -> Self {
+        self.default = default;
+        self
+    }
+
+    /// Same control, different label. For wording that only makes sense in one
+    /// scenario, e.g. which way is positive.
+    pub const fn with_label(mut self, label: &'static str) -> Self {
+        self.label = label;
+        self
+    }
 }
 
 /// Why a parameter write was rejected.
@@ -69,24 +96,16 @@ pub struct ParamDef<P: 'static> {
     pub set: fn(&mut P, f64),
 }
 
-/// Declare a parameter bound to a field. Keeps the table readable:
+/// Bind a parameter spec to a field. Keeps the table readable:
 ///
 /// ```ignore
-/// param!(SpringParams, mass, "mass", "Mass", "kg", 0.01, 50.0, 0.25, 0.01)
+/// bind!(SpringParams, mass, control("mass").with_default(0.25))
 /// ```
 #[macro_export]
-macro_rules! param {
-    ($ty:ty, $field:ident, $key:expr, $label:expr, $unit:expr, $min:expr, $max:expr, $default:expr, $step:expr) => {
+macro_rules! bind {
+    ($ty:ty, $field:ident, $spec:expr) => {
         $crate::params::ParamDef::<$ty> {
-            spec: $crate::params::ParamSpec {
-                key: $key,
-                label: $label,
-                unit: $unit,
-                min: $min,
-                max: $max,
-                default: $default,
-                step: $step,
-            },
+            spec: $spec,
             get: |p: &$ty| p.$field,
             set: |p: &mut $ty, v: f64| p.$field = v,
         }
@@ -153,10 +172,23 @@ mod tests {
         angle: f64,
     }
 
+    const fn spec(key: &'static str, min: f64, max: f64, default: f64) -> ParamSpec {
+        ParamSpec {
+            key,
+            label: key,
+            unit: "",
+            min,
+            max,
+            default,
+            step: 0.1,
+            tier: Tier::Basic,
+        }
+    }
+
     fn defs() -> Vec<ParamDef<Demo>> {
         vec![
-            param!(Demo, mass, "mass", "Mass", "kg", 0.1, 10.0, 2.0, 0.1),
-            param!(Demo, angle, "angle", "Angle", "deg", 0.0, 90.0, 30.0, 1.0),
+            bind!(Demo, mass, spec("mass", 0.1, 10.0, 2.0)),
+            bind!(Demo, angle, spec("angle", 0.0, 90.0, 30.0)),
         ]
     }
 
