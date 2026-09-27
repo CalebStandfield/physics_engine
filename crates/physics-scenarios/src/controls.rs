@@ -9,7 +9,9 @@
 
 use physics_core::params::{ParamSpec, Tier};
 
-/// Shorthand so the table below reads as a table.
+/// Shorthand so the table below reads as a table. One argument per `ParamSpec`
+/// field is the whole point here, so the arity lint does not apply.
+#[allow(clippy::too_many_arguments)]
 const fn ctl(
     key: &'static str,
     label: &'static str,

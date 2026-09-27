@@ -20,13 +20,13 @@ Constructed with a scenario id. Holds a `Simulation` across calls.
 | --- | --- |
 | `loadScenario(id)` | Swaps scenario, keeps integrator and step size. |
 | `scenarioId`, `scenarioName`, `description`, `coordinateLabel` | Getters. |
-| `schema()` | `ParamSpec[]`: key, label, unit, min, max, default, step. |
+| `schema()` | `ParamSpec[]`: key, label, unit, min, max, default, step, tier (`"basic"` or `"advanced"`). |
 | `getParam(key)`, `setParam(key, value)` | Writes take effect next step. `reset()` to restart from them. Out-of-range throws. |
 | `integratorId`, `setIntegrator(id)` | Unknown id throws. |
 | `dt` (get/set), `setHistory(capacity, stride)` | |
 | `reset()`, `step()`, `advance(elapsed)`, `runFor(duration)` | `advance` returns fixed steps run. |
 | `time`, `position`, `velocity`, `measuredPeriod` | Getters. `measuredPeriod` is undefined until one cycle. |
-| `snapshot()` | State, net force, accel, energy lost, steps, measured period, cycles, `frame`, `derived`. |
+| `snapshot()` | State, net force, accel, energy lost, steps, measured period, cycles, `frame` (body, axis, `pose`, forces, guides), `derived` (each row tiered like a param). |
 | `history()`, `historyLength` | Flat `[t, x, v, ...]`, oldest first. One typed array instead of thousands of objects. |
 
 ## Rules

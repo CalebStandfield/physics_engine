@@ -9,10 +9,11 @@ Served by `scripts/serve.sh`. `pkg/` is wasm-pack output, generated, do not edit
 
 | File | What is in it |
 | --- | --- |
-| `index.html` | Element ids the JS looks up: `tabs`, `scene`, `fbd`, `controls`, `solver`, `legend`, `readout`, `caption`, `boot`, `btn-start`, `btn-stop`, `btn-reset`. |
+| `index.html` | Element ids the JS looks up: `tabs`, `scene`, `fbd`, `controls`, `solver`, `solver-block`, `legend`, `readout`, `caption`, `boot`, `btn-start`, `btn-stop`, `btn-reset`, `mode-controls`, `mode-fbd`. |
 | `styles.css` | Dark theme, tokens in `:root`. Panels float over the canvas. Narrow-screen rules at the bottom under `@media (max-width: 1180px)`. |
-| `js/engine.js` | `Sim`, the wrapper over the wasm `Engine`. Module init, run/pause, and one snapshot cached per frame so every panel shares one boundary crossing. `MAX_FRAME = 0.1 s` clamps a long stall. |
-| `js/app.js` | Wiring and the `requestAnimationFrame` loop. Paused frames still redraw, so slider changes show up right away. |
+| `js/engine.js` | `Sim`, the wrapper over the wasm `Engine`. Module init, run/pause, and one snapshot cached per frame so every panel shares one boundary crossing. `MAX_FRAME = 0.1 s` clamps a long stall. `spec(key)` hands a panel one parameter's range. |
+| `js/memory.js` | `ParamMemory`. Slider values kept per scenario for as long as the page is open. |
+| `js/app.js` | Wiring and the `requestAnimationFrame` loop. Paused frames still redraw, so slider changes show up right away. Owns the simple/advanced mode. |
 | `js/camera.js` | `Camera`. World meters -> canvas pixels, and the only place world +y up flips to canvas +y down. |
 | `js/theme.js` | `COLOR` tokens plus `forceStyle(kind)`, `guideStyle(kind)`, `NET_STYLE`. Every canvas color comes from here. |
 | `js/render/` | Canvas drawing. See `js/render/README.md`. |
@@ -25,6 +26,25 @@ Served by `scripts/serve.sh`. `pkg/` is wasm-pack output, generated, do not edit
 - `fit(width, height, inset)` lerps toward the target view (`LERP = 0.12`, `PAD = 0.14`).
   `inset` is the region the floating panels cover, so the scene centers in what is visible.
 - `toPx(p)` is the conversion. `scale` is pixels per meter.
+
+## Simple and advanced
+
+One mode drives every panel, with a switch at the top of the controls panel and another at the
+top of the free body diagram panel. Both call the same handler, so flipping either moves both.
+`simple` shows the controls and readout rows the engine marked basic and hides the solver;
+`advanced` shows everything. Which rows are basic is the engine's call, carried on
+`ParamSpec.tier` and `Derived.tier`, so nothing in the frontend names a parameter. The mode is
+page state and survives a scenario switch.
+
+## What a scenario switch keeps
+
+- Slider values: kept per scenario in `js/memory.js`, in memory only. Switching back restores
+  what you had; a reload is a clean slate. Nothing bleeds between scenarios.
+- The run state: always paused. Starting one scenario should not hand a running clock to the
+  next one, so `Sim.loadScenario` clears `running` and `app.js` puts the buttons back.
+- Integrator and step size: kept, by the wasm `loadScenario`.
+- Everything else resets: the scenario is rebuilt, so the clock, the energy ledger and the
+  camera fit box all start over.
 
 ## Keyed on kind, never on scenario
 

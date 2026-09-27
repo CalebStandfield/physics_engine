@@ -50,6 +50,27 @@ Modular pipeline — each stage should be swappable without touching the others:
   spring constant, angle, etc.). No physics logic in JS — if the frontend needs a physics
   answer, it asks the WASM engine, it doesn't compute one itself.
 
+## Directory readmes
+
+Every feature directory has its own short readme. Start there instead of grepping blind:
+
+- `crates/physics-core/README.md` - state, integrators, the `Scenario` trait, params,
+  recorder, analysis, the `Simulation` driver.
+- `crates/physics-scenarios/README.md` - the spring and incline force laws, their
+  parameters and guides, the registry, and how to add a third scenario.
+- `crates/physics-wasm/README.md` - the full JS-facing API surface of the `Engine` class.
+- `web/README.md` - frontend layout, element ids, the `Sim` wrapper, the camera.
+- `web/js/render/README.md` - canvas primitives, the scene, the free body diagram.
+- `web/js/ui/README.md` - the DOM panels and what drives each one.
+- `scripts/README.md` - build and serve, and `run.sh` usage.
+
+Keep them current. If a change moves a file, renames a type, changes a force law, adds or
+removes a parameter, changes an invariant, or changes how one stage talks to the next, update
+that directory's readme in the same change. A stale readme is worse than no readme, because
+the next agent trusts it. Skip the update only for work that leaves the feature and the
+architecture exactly as described (a bug fix inside one function, a comment, formatting).
+New directory means a new readme, and a new readme means a line in this list.
+
 ## Review
 
 Any physics equations represented by code should go through the `physics-reviewer`
