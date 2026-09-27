@@ -329,3 +329,29 @@ fn a_damped_spring_oscillates_at_its_damped_period() {
         "{measured} s vs {damped} s"
     );
 }
+
+// The drawing hints have to agree with the geometry: the box turns with the
+// slope, and "up out of the surface" is a unit vector square to the slope.
+#[test]
+fn the_incline_pose_follows_the_slope() {
+    for angle_deg in [0.0, 25.0, 60.0, 89.0] {
+        let mut s = InclineScenario::new();
+        s.set_param("angle_deg", angle_deg).unwrap();
+        let pose = s.frame(&s.initial_state()).pose;
+        let axis = s.axis();
+
+        assert!((pose.angle + angle_deg.to_radians()).abs() < 1e-12);
+        assert!((pose.support.len() - 1.0).abs() < 1e-12);
+        assert!(pose.support.dot(axis).abs() < 1e-12);
+        // Out of the surface, not into it.
+        assert!(pose.support.y > 0.0);
+    }
+}
+
+#[test]
+fn a_hanging_spring_has_no_pose() {
+    let s = spring(0.5, 30.0, 0.05);
+    let pose = s.frame(&s.initial_state()).pose;
+    assert_eq!(pose.angle, 0.0);
+    assert_eq!(pose.support, physics_core::math::Vec2::ZERO);
+}

@@ -16,7 +16,7 @@
 use physics_core::bind;
 use physics_core::math::Vec2;
 use physics_core::params::{self, ParamDef, ParamError, ParamSpec};
-use physics_core::scenario::{Derived, ForceVector, Frame, Guide, Scenario};
+use physics_core::scenario::{BodyPose, Derived, ForceVector, Frame, Guide, Scenario};
 use physics_core::state::State;
 
 use crate::controls::control;
@@ -251,6 +251,8 @@ impl Scenario for SpringScenario {
         Frame {
             body: self.body_position(state.x),
             axis: AXIS,
+            // Hanging free: nothing to sit on, nothing to tilt against.
+            pose: BodyPose::default(),
             forces,
             guides,
         }
@@ -266,7 +268,7 @@ impl Scenario for SpringScenario {
         let grav_pe = m * self.params.gravity * self.body_position(state.x).y;
 
         let mut out = vec![
-            Derived::new("equilibrium_stretch", "Equilibrium stretch", "m", x0),
+            Derived::new("equilibrium_stretch", "Equilibrium stretch", "m", x0).advanced(),
             Derived::new(
                 "displacement",
                 "Displacement from equilibrium",
@@ -285,29 +287,29 @@ impl Scenario for SpringScenario {
                 "N",
                 self.spring_force(state.x),
             ),
-            Derived::new("weight", "Weight", "N", self.weight()),
-            Derived::new("kinetic_energy", "Kinetic energy", "J", kinetic),
-            Derived::new("spring_energy", "Spring energy", "J", spring_pe),
-            Derived::new("gravitational_energy", "Gravitational energy", "J", grav_pe),
+            Derived::new("weight", "Weight", "N", self.weight()).advanced(),
+            Derived::new("kinetic_energy", "Kinetic energy", "J", kinetic).advanced(),
+            Derived::new("spring_energy", "Spring energy", "J", spring_pe).advanced(),
+            Derived::new("gravitational_energy", "Gravitational energy", "J", grav_pe).advanced(),
             Derived::new(
                 "mechanical_energy",
                 "Total mechanical energy",
                 "J",
                 kinetic + spring_pe + grav_pe,
-            ),
+            )
+            .advanced(),
         ];
 
         if self.params.damping > 0.0 {
-            out.push(Derived::new(
-                "damping_ratio",
-                "Damping ratio",
-                "",
-                self.damping_ratio(),
-            ));
+            out.push(
+                Derived::new("damping_ratio", "Damping ratio", "", self.damping_ratio()).advanced(),
+            );
             // Damping stretches the period, so the undamped formula is not
             // what a stopwatch would read here.
             if let Some(damped) = self.damped_period() {
-                out.push(Derived::new("damped_period", "Damped period", "s", damped));
+                out.push(
+                    Derived::new("damped_period", "Damped period", "s", damped).advanced(),
+                );
             }
         }
         out

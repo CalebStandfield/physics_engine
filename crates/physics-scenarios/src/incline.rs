@@ -24,7 +24,7 @@
 use physics_core::bind;
 use physics_core::math::Vec2;
 use physics_core::params::{self, ParamDef, ParamError, ParamSpec};
-use physics_core::scenario::{Derived, ForceVector, Frame, Guide, Scenario};
+use physics_core::scenario::{BodyPose, Derived, ForceVector, Frame, Guide, Scenario};
 use physics_core::state::State;
 
 use crate::controls::control;
@@ -302,6 +302,12 @@ impl Scenario for InclineScenario {
         Frame {
             body,
             axis,
+            // The box lies along the slope and sits on top of it. `body` stays on
+            // the surface line, where the physics puts it.
+            pose: BodyPose {
+                angle: -self.angle(),
+                support: normal,
+            },
             forces,
             guides,
         }
@@ -319,13 +325,15 @@ impl Scenario for InclineScenario {
                 "Gravity along slope",
                 "N",
                 self.gravity_parallel(),
-            ),
+            )
+            .advanced(),
             Derived::new(
                 "gravity_perpendicular",
                 "Gravity into slope",
                 "N",
                 self.gravity_perpendicular(),
-            ),
+            )
+            .advanced(),
             Derived::new("normal_force", "Normal force", "N", self.normal_force()),
             Derived::new("friction_force", "Friction force", "N", friction),
             Derived::new(
@@ -333,7 +341,8 @@ impl Scenario for InclineScenario {
                 "Static friction limit",
                 "N",
                 self.max_static_friction(),
-            ),
+            )
+            .advanced(),
             Derived::new("net_force", "Net force along slope", "N", net),
             Derived::new(
                 "acceleration",
@@ -346,20 +355,23 @@ impl Scenario for InclineScenario {
                 "Textbook sliding acceleration",
                 "m/s^2",
                 self.ideal_sliding_accel(),
-            ),
+            )
+            .advanced(),
             Derived::new(
                 "kinetic_energy",
                 "Kinetic energy",
                 "J",
                 state.kinetic_energy(self.params.mass),
-            ),
+            )
+            .advanced(),
             Derived::new(
                 "distance_remaining",
                 "Distance left on ramp",
                 "m",
                 (self.params.length - state.x).max(0.0),
-            ),
-            Derived::new("sliding", "Sliding", "", if sliding { 1.0 } else { 0.0 }),
+            )
+            .advanced(),
+            Derived::new("sliding", "Sliding", "", if sliding { 1.0 } else { 0.0 }).advanced(),
         ]
     }
 }

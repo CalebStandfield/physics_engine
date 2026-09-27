@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::math::Vec2;
-use crate::params::{ParamError, ParamSpec};
+use crate::params::{ParamError, ParamSpec, Tier};
 use crate::state::State;
 
 /// One labeled force acting on the body, in world space, newtons.
@@ -53,6 +53,24 @@ impl Guide {
     }
 }
 
+/// How the body sits, for drawing only. No physics reads this.
+///
+/// A block on a ramp is a point mass to the solver, but drawing it as an
+/// axis-aligned square lying across the slope line looks wrong, so a scenario
+/// says here how the box should be turned and which way is "up" out of whatever
+/// it is resting on.
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+pub struct BodyPose {
+    /// Rotation of the body, radians counterclockwise from world +x. Zero draws
+    /// it axis-aligned.
+    pub angle: f64,
+    /// Unit vector out of the surface the body rests on. A renderer lifts the
+    /// drawn box half its height along this, so the surface line touches the
+    /// bottom of the box instead of cutting through its middle. Zero when
+    /// nothing supports the body.
+    pub support: Vec2,
+}
+
 /// Everything needed to draw the system at one instant, in world meters.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Frame {
@@ -60,6 +78,8 @@ pub struct Frame {
     pub body: Vec2,
     /// Unit vector pointing along increasing `State::x`.
     pub axis: Vec2,
+    /// How the body is turned and seated. Drawing only.
+    pub pose: BodyPose,
     /// Every force on the body, for the free-body diagram.
     pub forces: Vec<ForceVector>,
     /// Static scenery.
@@ -85,16 +105,27 @@ pub struct Derived {
     pub label: String,
     pub unit: String,
     pub value: f64,
+    /// Whether a short readout should show this row. Same split as the
+    /// parameters, so one switch in the UI drives both.
+    pub tier: Tier,
 }
 
 impl Derived {
+    /// A row worth showing in a short readout.
     pub fn new(key: &str, label: &str, unit: &str, value: f64) -> Self {
         Self {
             key: key.to_string(),
             label: label.to_string(),
             unit: unit.to_string(),
             value,
+            tier: Tier::Basic,
         }
+    }
+
+    /// Demote the row to the long readout.
+    pub fn advanced(mut self) -> Self {
+        self.tier = Tier::Advanced;
+        self
     }
 }
 
