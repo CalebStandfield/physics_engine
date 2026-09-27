@@ -163,18 +163,20 @@ body {
   font-weight: 500;
 }
 
+/* Pinned to the top, not centered: a panel that grows and shrinks with the
+   simple/advanced switch should only ever move its bottom edge. The top is
+   where a full-height panel already sat, so advanced looks unchanged. */
 .panel-controls {
   left: 20px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 20px;
   width: 290px;
   max-height: calc(100% - 40px);
   overflow-y: auto;
 }
 
-/* Right column: legend pinned to the top, the diagram floating below it in
-   whatever room is left. Stacked rather than absolutely placed so a long
-   readout can never cover the legend. */
+/* Right column: legend pinned to the top, the diagram directly under it.
+   Stacked rather than absolutely placed so a long readout can never cover the
+   legend. */
 .col-right {
   position: absolute;
   z-index: 20;
@@ -197,8 +199,9 @@ body {
   flex: none;
 }
 
+/* Sits under the legend and grows down, same reason as the controls panel.
+   `margin-bottom: auto` keeps the leftover room below it. */
 .panel-fbd {
-  margin-top: auto;
   margin-bottom: auto;
   min-height: 0;
   overflow-y: auto;

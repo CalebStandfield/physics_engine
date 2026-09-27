@@ -8,6 +8,7 @@ import { FbdRenderer } from "./render/fbd.js";
 import { buildTabs, setActiveTab, setCaption } from "./ui/topbar.js";
 import { buildControls, buildSolver } from "./ui/controls.js";
 import { SIMPLE, buildModeToggle, setActiveMode } from "./ui/mode.js";
+import { resizeAround } from "./ui/accordion.js";
 import { buildLegend } from "./ui/legend.js";
 import { Readout } from "./ui/readout.js";
 import { overlayInset } from "./ui/inset.js";
@@ -28,10 +29,10 @@ async function main() {
   const fbd = new FbdRenderer(el("fbd"));
   const readout = new Readout(el("readout"));
 
-  // How much of every panel is on screen. Page state, so it survives a scenario
-  // switch, and both toggles show the same thing.
-  let mode = SIMPLE;
-  const toggles = [el("mode-controls"), el("mode-fbd")];
+  // How much of each panel is on screen. One mode per panel: trimming the
+  // controls should not also trim the readout. Page state, so both survive a
+  // scenario switch.
+  const mode = { controls: SIMPLE, readout: SIMPLE };
 
   // The mass slider's range, which sets how thick the block's border gets drawn.
   let massRange = sim.spec("mass");
@@ -39,20 +40,26 @@ async function main() {
   const rebuild = () => {
     camera.reset();
     massRange = sim.spec("mass");
-    buildControls(el("controls"), sim, mode, () => {});
+    buildControls(el("controls"), sim, mode.controls, () => {});
     buildSolver(el("solver"), sim);
-    el("solver-block").classList.toggle("hidden", mode === SIMPLE);
+    el("solver-block").classList.toggle("hidden", mode.controls === SIMPLE);
     setCaption(el("caption"), sim.entry);
   };
 
-  const setMode = (next) => {
-    if (next === mode) return;
-    mode = next;
-    for (const root of toggles) setActiveMode(root, mode);
-    rebuild();
+  // One switch, the panel it resizes, and what to redraw when it moves.
+  const wireMode = (toggle, panel, key, apply) => {
+    buildModeToggle(toggle, mode[key], (next) => {
+      if (next === mode[key]) return;
+      mode[key] = next;
+      setActiveMode(toggle, next);
+      resizeAround(panel, apply);
+    });
   };
 
-  for (const root of toggles) buildModeToggle(root, mode, setMode);
+  wireMode(el("mode-controls"), el("panel-controls"), "controls", rebuild);
+  wireMode(el("mode-fbd"), el("panel-fbd"), "readout", () =>
+    readout.update(sim, mode.readout),
+  );
 
   const transport = (running) => {
     sim.running = running;
@@ -95,7 +102,7 @@ async function main() {
     scene.draw(snap.frame, body, overlayInset(el("scene"), overlays));
     fbd.draw(snap.frame.forces, body);
     buildLegend(el("legend"), snap.frame);
-    readout.update(sim, mode);
+    readout.update(sim, mode.readout);
 
     requestAnimationFrame(frame);
   };

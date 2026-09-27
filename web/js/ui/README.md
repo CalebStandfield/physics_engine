@@ -9,6 +9,7 @@ DOM panels. All of them are rebuilt from engine data, so a new scenario needs no
 | `legend.js` | `buildLegend`. Rows for the forces in the current frame plus one per scenery kind. |
 | `readout.js` | `Readout`. Clock, the scenario's `derived` rows, energy lost, measured period, and the measured-vs-predicted percentages. |
 | `mode.js` | `buildModeToggle`, `setActiveMode`, and `shows(mode, tier)`, the one place the simple/advanced rule lives. |
+| `accordion.js` | `resizeAround(panel, change)`. Tweens a panel's height across a rebuild so it folds instead of snapping. |
 | `format.js` | `num(value, step)` and `unitSuffix(unit)`. Keeps columns from jittering as values cross zero. |
 | `inset.js` | `overlayInset(canvas, overlays)`. How much of the canvas the floating panels cover, per side. |
 
@@ -18,8 +19,13 @@ DOM panels. All of them are rebuilt from engine data, so a new scenario needs no
   matching `RESET_ONLY` (`/^initial_/`) get an "on reset" tag. `DT_CHOICES` is 1/240, 1/480, 1/960 s.
   In `simple` mode the advanced-tier specs are skipped; the tier is the engine's, from the
   control catalog in `physics-scenarios`.
-- `mode.js`: two toggles, one mode. `shows(mode, tier)` is the whole rule, used by both
-  `controls.js` and `readout.js`, so the two panels can never disagree about what basic means.
+- `mode.js`: two toggles, one per panel, each with its own mode. `shows(mode, tier)` is the
+  whole rule, used by both `controls.js` and `readout.js`, so neither panel invents its own
+  idea of what basic means.
+- `accordion.js`: measures, runs the change, measures again, then animates the box between the
+  two heights (220 ms, ease-out) with the Web Animations API. The content swap is instant; only
+  the panel's height is tweened, and no inline height is left behind. It animates even under
+  `prefers-reduced-motion`; the comment in the file says how to hand that setting back.
 - `legend.js`: skips the rebuild when the row set has not changed (`root.dataset.key`).
   `GUIDE_NAMES` maps guide kind to a display name, falling back to the guide's own label.
 - `readout.js`: rows carry a tier like the controls do. The engine tiers its own `derived`

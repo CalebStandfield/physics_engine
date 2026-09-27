@@ -10,7 +10,7 @@ plain reload. `pkg/` is wasm-pack output, generated, do not edit.
 
 | File | What is in it |
 | --- | --- |
-| `index.html` | Element ids the JS looks up: `tabs`, `scene`, `fbd`, `controls`, `solver`, `solver-block`, `legend`, `readout`, `caption`, `boot`, `btn-start`, `btn-stop`, `btn-reset`, `mode-controls`, `mode-fbd`. |
+| `index.html` | Element ids the JS looks up: `tabs`, `scene`, `fbd`, `controls`, `solver`, `solver-block`, `legend`, `readout`, `caption`, `boot`, `btn-start`, `btn-stop`, `btn-reset`, `mode-controls`, `mode-fbd`, `panel-controls`, `panel-fbd`. |
 | `styles.css` | Dark theme, tokens in `:root`. Panels float over the canvas. Narrow-screen rules at the bottom under `@media (max-width: 1180px)`. |
 | `js/engine.js` | `Sim`, the wrapper over the wasm `Engine`. Module init, run/pause, and one snapshot cached per frame so every panel shares one boundary crossing. `MAX_FRAME = 0.1 s` clamps a long stall. `spec(key)` hands a panel one parameter's range. |
 | `js/memory.js` | `ParamMemory`. Slider values kept per scenario for as long as the page is open. |
@@ -30,12 +30,16 @@ plain reload. `pkg/` is wasm-pack output, generated, do not edit.
 
 ## Simple and advanced
 
-One mode drives every panel, with a switch at the top of the controls panel and another at the
-top of the free body diagram panel. Both call the same handler, so flipping either moves both.
-`simple` shows the controls and readout rows the engine marked basic and hides the solver;
-`advanced` shows everything. Which rows are basic is the engine's call, carried on
-`ParamSpec.tier` and `Derived.tier`, so nothing in the frontend names a parameter. The mode is
-page state and survives a scenario switch.
+Each panel has its own switch and its own mode: one at the top of the controls panel, one at
+the top of the free body diagram panel, and they are independent. Trimming the controls does
+not trim the readout. `simple` shows the controls or readout rows the engine marked basic, and
+hides the solver; `advanced` shows everything. Which rows are basic is the engine's call,
+carried on `ParamSpec.tier` and `Derived.tier`, so nothing in the frontend names a parameter.
+Both modes are page state and survive a scenario switch.
+
+Panels only grow downward. `.panel-controls` is pinned 20px from the top rather than centered,
+and `.panel-fbd` sits directly under the legend, so switching modes moves the bottom edge and
+nothing else. The height change is tweened by `js/ui/accordion.js`.
 
 ## What a scenario switch keeps
 
