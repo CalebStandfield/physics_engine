@@ -16,6 +16,7 @@ RUN_DIR="$ROOT/.run"
 PID_FILE="$RUN_DIR/server-$PORT.pid"
 LOG_FILE="$RUN_DIR/server-$PORT.log"
 URL="http://localhost:$PORT"
+SERVER="$ROOT/scripts/devserver.py"
 
 # Pid of our background server on this port, empty if there is not one. A
 # recorded pid that has died, or that some unrelated process has since been
@@ -25,7 +26,7 @@ running_pid() {
 
   local pid
   pid="$(cat "$PID_FILE" 2>/dev/null || true)"
-  if [ -n "$pid" ] && ps -p "$pid" -o command= 2>/dev/null | grep -q "http\.server"; then
+  if [ -n "$pid" ] && ps -p "$pid" -o command= 2>/dev/null | grep -q "devserver\.py"; then
     echo "$pid"
   else
     rm -f "$PID_FILE"
@@ -43,6 +44,7 @@ port_holder() {
 # Everything the server needs before it is worth starting one.
 check_ready() {
   need python3 "Install Python 3, or serve $WEB_DIR with any static file server."
+  [ -f "$SERVER" ] || die "$SERVER is missing."
   [ -f "$PKG_DIR/physics_wasm.js" ] ||
     die "$PKG_DIR is empty. Run ./run.sh or scripts/build.sh first."
 }
@@ -50,7 +52,7 @@ check_ready() {
 cmd_foreground() {
   check_ready
   echo "serving $URL"
-  exec python3 -m http.server "$PORT" --directory "$WEB_DIR"
+  exec python3 "$SERVER" "$PORT" "$WEB_DIR"
 }
 
 cmd_start() {
@@ -68,7 +70,7 @@ cmd_start() {
 
   check_ready
   mkdir -p "$RUN_DIR"
-  nohup python3 -m http.server "$PORT" --directory "$WEB_DIR" >"$LOG_FILE" 2>&1 &
+  nohup python3 "$SERVER" "$PORT" "$WEB_DIR" >"$LOG_FILE" 2>&1 &
   echo $! >"$PID_FILE"
 
   # Give it a moment to fall over on its own before claiming it is up.

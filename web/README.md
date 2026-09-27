@@ -3,7 +3,8 @@
 HTML/Canvas frontend. Renders what the engine reports and reads/writes parameters.
 No physics in JS: if the frontend needs a physics answer it asks wasm.
 
-Served by `scripts/serve.sh`. `pkg/` is wasm-pack output, generated, do not edit.
+Served by `scripts/serve.sh`, which sends `Cache-Control: no-store` so a rebuild shows up on a
+plain reload. `pkg/` is wasm-pack output, generated, do not edit.
 
 ## Files
 
