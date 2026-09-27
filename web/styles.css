@@ -217,34 +217,38 @@ body {
 
 /* ---------- simple | advanced switch ---------- */
 
-/* One switch per panel, both driving the same mode. Sits above the panel's own
-   heading, so it reads as "how much of this panel do you want". */
+/* One switch per panel, both driving the same mode. A segmented control:
+   centered above the panel's own heading, equal halves so the active chip does
+   not resize as it moves, and the same orange-on-dark the primary button uses. */
 .mode {
   display: flex;
-  gap: 2px;
-  margin-bottom: 12px;
-  padding: 2px;
+  gap: 3px;
+  width: fit-content;
+  margin: 0 auto 14px;
+  padding: 3px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 8px;
+  background: rgba(8, 9, 12, 0.55);
 }
 
 .mode-btn {
   appearance: none;
-  flex: 1;
+  min-width: 84px;
   font: inherit;
   font-size: 10px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  padding: 5px 0;
+  text-align: center;
+  padding: 6px 10px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 6px;
   background: none;
   color: var(--muted);
   cursor: pointer;
 }
 
-.mode-btn:hover {
-  color: var(--orange);
+.mode-btn:hover:not(.active) {
+  color: var(--text);
 }
 
 .mode-btn.active {
