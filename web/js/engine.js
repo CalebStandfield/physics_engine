@@ -14,6 +14,21 @@ import { ParamMemory } from "./memory.js";
 
 const MAX_FRAME = 0.1; // s of real time fed to the engine in one go
 
+// Everything a landing-page card needs to draw one scenario: a still frame at
+// that scenario's defaults, plus the mass the block is drawn with. The engine
+// is thrown away, nothing is stepped, and the running Sim is left alone.
+// `init()` has to have finished, so call this after `Sim.boot`.
+export function stillShot(id) {
+  const engine = new Engine(id);
+  return {
+    frame: engine.snapshot().frame,
+    body: {
+      mass: engine.getParam("mass"),
+      range: engine.schema().find((s) => s.key === "mass"),
+    },
+  };
+}
+
 export class Sim {
   constructor(engine, catalog, integratorList) {
     this.engine = engine;

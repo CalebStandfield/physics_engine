@@ -10,19 +10,34 @@ plain reload. `pkg/` is wasm-pack output, generated, do not edit.
 
 | File | What is in it |
 | --- | --- |
-| `index.html` | Element ids the JS looks up: `tabs`, `scene`, `fbd`, `controls`, `solver`, `solver-block`, `legend`, `readout`, `caption`, `boot`, `btn-start`, `btn-stop`, `btn-reset`, `mode-controls`, `mode-fbd`, `panel-controls`, `panel-fbd`. |
+| `index.html` | Two views: the landing page (`home`) and the stage (`stage`). Icons are named with `data-icon` and swapped for Phosphor glyphs (fill weight) at boot by `js/ui/icons.js`. Element ids the JS looks up: `home`, `cards`, `stage`, `tabs`, `btn-home`, `scene`, `fbd`, `controls`, `solver`, `solver-block`, `legend`, `readout`, `caption`, `boot`, `btn-start`, `btn-stop`, `btn-reset`, `mode-controls`, `mode-fbd`, `panel-controls`, `panel-fbd`. |
 | `styles.css` | Dark theme, tokens in `:root`. Panels float over the canvas. Narrow-screen rules at the bottom under `@media (max-width: 1180px)`. |
-| `js/engine.js` | `Sim`, the wrapper over the wasm `Engine`. Module init, run/pause, and one snapshot cached per frame so every panel shares one boundary crossing. `MAX_FRAME = 0.1 s` clamps a long stall. `spec(key)` hands a panel one parameter's range. |
+| `js/engine.js` | `Sim`, the wrapper over the wasm `Engine`. Module init, run/pause, and one snapshot cached per frame so every panel shares one boundary crossing. `MAX_FRAME = 0.1 s` clamps a long stall. `spec(key)` hands a panel one parameter's range. `stillShot(id)` is a one-off frame of any scenario at its defaults, for the landing page cards. |
 | `js/memory.js` | `ParamMemory`. Slider values kept per scenario for as long as the page is open. |
-| `js/app.js` | Wiring and the `requestAnimationFrame` loop. Paused frames still redraw, so slider changes show up right away. Owns the simple/advanced mode. |
+| `js/app.js` | Wiring, the two-view switch, and the `requestAnimationFrame` loop. Paused frames still redraw, so slider changes show up right away. Owns the simple/advanced mode. |
 | `js/camera.js` | `Camera`. World meters -> canvas pixels, and the only place world +y up flips to canvas +y down. |
 | `js/theme.js` | `COLOR` tokens plus `forceStyle(kind)`, `guideStyle(kind)`, `NET_STYLE`. Every canvas color comes from here. |
 | `js/render/` | Canvas drawing. See `js/render/README.md`. |
-| `js/ui/` | DOM panels. See `js/ui/README.md`. |
+| `js/ui/` | DOM panels and the icon set. See `js/ui/README.md`. |
+
+## Two views
+
+The page opens on a landing page: a title block (name, one line, two chips) and one card per
+scenario, each with a still render of that scenario. Clicking a card loads it and swaps to the
+stage; the brand on the left of the rail goes back and pauses whatever was running, same rule
+as switching scenarios. The scenario tabs only show on the stage, since the landing page is
+already the list.
+
+Cards are built from `scenario_catalog()` in `js/ui/home.js`, so a scenario added in Rust gets
+a card with no change here. The grid is `auto-fit`, so two scenarios sit side by side and four
+fall into a 2x2. Previews are drawn once and again on resize; the render loop does nothing
+while the landing page is up.
 
 ## Camera
 
-- `observe(frame)` grows an accumulated fit box over the body and every guide point. The box
+- `observe(frame, guides)` grows an accumulated fit box over the body and every guide point.
+  `guides` defaults to all of them; a renderer that hides some (the card previews) passes the
+  ones it actually draws, so the view leaves no room for lines nobody sees. The box
   only grows between `reset()` calls, otherwise an oscillating body makes the view breathe.
 - `fit(width, height, inset)` lerps toward the target view (`LERP = 0.12`, `PAD = 0.14`).
   `inset` is the region the floating panels cover, so the scene centers in what is visible.

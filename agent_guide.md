@@ -59,7 +59,8 @@ Every feature directory has its own short readme. Start there instead of greppin
 - `crates/physics-scenarios/README.md` - the spring and incline force laws, their
   parameters and guides, the registry, and how to add a third scenario.
 - `crates/physics-wasm/README.md` - the full JS-facing API surface of the `Engine` class.
-- `web/README.md` - frontend layout, element ids, the `Sim` wrapper, the camera.
+- `web/README.md` - frontend layout, the landing page and the stage, element ids, the
+  `Sim` wrapper, the camera.
 - `web/js/render/README.md` - canvas primitives, the scene, the free body diagram.
 - `web/js/ui/README.md` - the DOM panels and what drives each one.
 - `scripts/README.md` - build and serve, and `run.sh` usage.

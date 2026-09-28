@@ -4,6 +4,8 @@ DOM panels. All of them are rebuilt from engine data, so a new scenario needs no
 
 | File | What is in it |
 | --- | --- |
+| `home.js` | `buildCards`. The landing page grid, one card per catalog entry, returning each card's canvas so the caller can draw a preview into it. |
+| `icons.js` | `ICONS`, `icon(name)`, `hydrateIcons(root)`. Phosphor Icons (fill weight) vendored as path data. |
 | `topbar.js` | `buildTabs`, `setActiveTab`, `setCaption`. Scenario tabs from `scenario_catalog()`. |
 | `controls.js` | `buildControls` (one slider per `ParamSpec` the mode shows), `buildSolver` (integrator picker and step-size picker). |
 | `legend.js` | `buildLegend`. Rows for the forces in the current frame plus one per scenery kind. |
@@ -15,6 +17,15 @@ DOM panels. All of them are rebuilt from engine data, so a new scenario needs no
 
 ## Details worth knowing
 
+- `home.js`: cards come from `scenario_catalog()`, so a new scenario shows up with no change
+  here. The grid is CSS `auto-fit`, so two cards sit side by side and four fall into a 2x2.
+  The title block above them is static markup in `index.html`; only the cards are built here.
+- `icons.js`: the page has no network at runtime, so nothing loads from a CDN. Each entry is
+  one Phosphor glyph's `d` on a 256x256 box, copied from `@phosphor-icons/core` (MIT), all of
+  them the `fill` weight so the rail matches the portfolio. Static
+  markup names an icon with `<i data-icon="house-simple">` and `hydrateIcons(document)` swaps
+  the slots for real `<svg>`s at boot; JS that builds its own DOM calls `icon(name)`. Glyphs
+  are `fill: currentColor` and sized by the rule around them, so `.ph` never picks a color.
 - `controls.js`: sliders come straight from `sim.schema()`, nothing names a parameter. Keys
   matching `RESET_ONLY` (`/^initial_/`) get an "on reset" tag. `DT_CHOICES` is 1/240, 1/480, 1/960 s.
   In `simple` mode the advanced-tier specs are skipped; the tier is the engine's, from the

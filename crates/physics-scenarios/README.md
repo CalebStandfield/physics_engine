@@ -62,5 +62,5 @@ tier, so one switch in the UI trims both panels.
 
 One new module implementing `Scenario`, one `use` and one entry in `SCENARIOS` in
 `registry.rs`. Reuse the control keys that already exist and add new ones to `controls.rs`. Nothing in the core, the bindings or the JS changes. The frontend reads
-the catalog and the parameter schema at runtime, so it gets tabs, sliders, a legend and a
-readout for free.
+the catalog and the parameter schema at runtime, so it gets a landing page card, a tab,
+sliders, a legend and a readout for free.

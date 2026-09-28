@@ -9,35 +9,64 @@
   <body>
     <header class="rail">
       <div class="rail-left">
-        <!-- TODO: point at your portfolio root -->
-        <a class="home" href="https://example.com" title="Home">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M3 10.5 12 3l9 7.5" />
-            <path d="M5 9.5V21h14V9.5" />
-          </svg>
+        <button class="home" id="btn-home" title="Back to the scenario list">
+          <i data-icon="house-simple"></i>
           <span class="name">caleb</span><span>::</span><span class="name">standfield</span>
-        </a>
+        </button>
       </div>
 
-      <nav class="tabs" id="tabs"></nav>
+      <nav class="tabs hidden" id="tabs"></nav>
 
       <div class="rail-right">
-        <!-- TODO: your portfolio URL -->
-        <a class="link" href="https://example.com" target="_blank" rel="noreferrer">portfolio</a>
-        <!-- TODO: your LinkedIn URL -->
-        <a class="link" href="https://www.linkedin.com/" target="_blank" rel="noreferrer">linkedin</a>
-        <a class="link" href="https://github.com/CalebStandfield" target="_blank" rel="noreferrer">github</a>
+        <a class="link" href="https://calebstandfield.dev" target="_blank" rel="noreferrer"
+           title="Portfolio" aria-label="Portfolio">
+          <i data-icon="briefcase"></i>
+        </a>
+        <a class="link" href="https://github.com/CalebStandfield" target="_blank"
+           rel="noreferrer" title="GitHub" aria-label="GitHub">
+          <i data-icon="github-logo"></i>
+        </a>
+        <a class="link" href="https://www.linkedin.com/in/caleb-standfield/" target="_blank"
+           rel="noreferrer" title="LinkedIn" aria-label="LinkedIn">
+          <i data-icon="linkedin-logo"></i>
+        </a>
       </div>
     </header>
 
-    <main class="stage">
+    <main class="landing" id="home">
+      <div class="landing-inner">
+        <section class="title">
+          <p class="kicker">rust / webassembly / canvas</p>
+          <h1>physics <span>engine</span></h1>
+          <p class="tagline">A rigid body sandbox that runs entirely in this tab.</p>
+
+          <ul class="facts">
+            <li>engine in wasm</li>
+            <li>live forces + free body diagram</li>
+          </ul>
+        </section>
+
+        <div class="pick">
+          <span class="pick-rule"></span>
+          <span class="pick-label">select a scenario</span>
+          <span class="pick-rule"></span>
+        </div>
+
+        <div class="cards" id="cards"></div>
+      </div>
+    </main>
+
+    <main class="stage hidden" id="stage">
       <canvas id="scene"></canvas>
 
       <div class="transport">
-        <button class="btn primary" id="btn-start">Start</button>
-        <button class="btn" id="btn-stop">Stop</button>
-        <button class="btn" id="btn-reset">Reset</button>
+        <button class="btn primary" id="btn-start">
+          <i data-icon="play"></i>Start
+        </button>
+        <button class="btn" id="btn-stop"><i data-icon="stop"></i>Stop</button>
+        <button class="btn" id="btn-reset">
+          <i data-icon="arrow-counter-clockwise"></i>Reset
+        </button>
       </div>
 
       <section class="panel panel-controls" id="panel-controls">

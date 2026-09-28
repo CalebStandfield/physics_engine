@@ -1,10 +1,12 @@
 // Wiring and the render loop. Reads state from the engine, hands it to the
 // renderers and the panels. Computes nothing physical.
 
-import { Sim } from "./engine.js";
+import { Sim, stillShot } from "./engine.js";
 import { Camera } from "./camera.js";
 import { SceneRenderer } from "./render/scene.js";
+import { Preview } from "./render/preview.js";
 import { FbdRenderer } from "./render/fbd.js";
+import { buildCards } from "./ui/home.js";
 import { buildTabs, setActiveTab, setCaption } from "./ui/topbar.js";
 import { buildControls, buildSolver } from "./ui/controls.js";
 import { SIMPLE, buildModeToggle, setActiveMode } from "./ui/mode.js";
@@ -12,10 +14,15 @@ import { resizeAround } from "./ui/accordion.js";
 import { buildLegend } from "./ui/legend.js";
 import { Readout } from "./ui/readout.js";
 import { overlayInset } from "./ui/inset.js";
+import { hydrateIcons } from "./ui/icons.js";
 
 const el = (id) => document.getElementById(id);
 
 async function main() {
+  // Static markup names its icons with `data-icon`; swap them for real glyphs
+  // before anything else so nothing pops in later.
+  hydrateIcons(document);
+
   let sim;
   try {
     sim = await Sim.boot();
@@ -67,15 +74,59 @@ async function main() {
     el("btn-stop").disabled = !running;
   };
 
-  buildTabs(el("tabs"), sim.catalog, sim.id, (id) => {
-    if (id === sim.id) return;
-    sim.loadScenario(id);
+  // Landing page first, the stage once a scenario is picked. Two views, so a
+  // flag rather than a router.
+  let onStage = false;
+
+  const show = (stage) => {
+    onStage = stage;
+    el("stage").classList.toggle("hidden", !stage);
+    el("home").classList.toggle("hidden", stage);
+    el("tabs").classList.toggle("hidden", !stage);
+    if (!stage) drawPreviews();
+  };
+
+  const open = (id) => {
+    if (id !== sim.id) sim.loadScenario(id);
     setActiveTab(el("tabs"), sim.catalog, id);
     // The engine pauses on a swap; keep the buttons saying so.
     transport(false);
     rebuild();
+    show(true);
+  };
+
+  buildTabs(el("tabs"), sim.catalog, sim.id, (id) => {
+    if (id === sim.id) return;
+    open(id);
   });
+
+  // One still shot and one renderer per card, both taken once. Cards only
+  // redraw when the layout changes.
+  const shots = new Map(sim.catalog.map((e) => [e.id, stillShot(e.id)]));
+  const cards = buildCards(el("cards"), sim.catalog, open).map((card) => ({
+    ...card,
+    preview: new Preview(card.canvas),
+  }));
+
+  function drawPreviews() {
+    for (const card of cards) card.preview.draw(shots.get(card.entry.id));
+  }
+
+  // The brand is the way back: no separate overview button, the landing page is
+  // the only other view. Leaving a scenario pauses it, same rule as switching
+  // between two.
+  el("btn-home").addEventListener("click", () => {
+    if (!onStage) return;
+    transport(false);
+    show(false);
+  });
+
+  window.addEventListener("resize", () => {
+    if (!onStage) drawPreviews();
+  });
+
   rebuild();
+  show(false);
 
   el("btn-start").addEventListener("click", () => transport(true));
   el("btn-stop").addEventListener("click", () => transport(false));
@@ -93,6 +144,11 @@ async function main() {
   const frame = (now) => {
     const elapsed = (now - last) / 1000;
     last = now;
+
+    if (!onStage) {
+      requestAnimationFrame(frame);
+      return;
+    }
 
     sim.tick(elapsed);
 

@@ -11,17 +11,21 @@ import { borderWidth } from "./mass.js";
 // Painting order by guide kind. Lower draws first.
 const DEPTH = { reference: 0, surface: 1, anchor: 1, spring: 2, axis: 3 };
 
+// Guides that annotate the setup rather than being part of it. Everything else
+// is geometry the body actually touches.
+const ANNOTATION = new Set(["reference", "axis"]);
+
 const MAX_FORCE_PX = 110; // longest force arrow in the scene
 
 // Room left around the geometry for force arrows and their labels.
 const ARROW_ROOM = MAX_FORCE_PX + 40;
 
-function pad(inset = {}) {
+function pad(inset = {}, room) {
   return {
-    left: (inset.left ?? 0) + ARROW_ROOM,
-    right: (inset.right ?? 0) + ARROW_ROOM,
-    top: (inset.top ?? 0) + ARROW_ROOM,
-    bottom: (inset.bottom ?? 0) + ARROW_ROOM,
+    left: (inset.left ?? 0) + room,
+    right: (inset.right ?? 0) + room,
+    top: (inset.top ?? 0) + room,
+    bottom: (inset.bottom ?? 0) + room,
   };
 }
 
@@ -52,10 +56,30 @@ function labelAnchor(pts, bodyPx) {
 }
 
 export class SceneRenderer {
-  constructor(canvas, camera) {
+  // `forces`, `annotations` and `labels` turn off the arrows, the reference
+  // and axis guides, and the guide text. `room` is the margin left around the
+  // geometry. The defaults are the full stage; a landing-page card wants the
+  // shape of the scenario and nothing else, so it drops all three and shrinks
+  // the margin.
+  constructor(
+    canvas,
+    camera,
+    {
+      forces = true,
+      annotations = true,
+      labels = true,
+      room = ARROW_ROOM,
+      bodyFraction = 0.07,
+    } = {},
+  ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.camera = camera;
+    this.forces = forces;
+    this.annotations = annotations;
+    this.labels = labels;
+    this.room = room;
+    this.bodyFraction = bodyFraction;
   }
 
   // `body` is `{ mass, range }`: the current mass and the slider range it came
@@ -64,14 +88,13 @@ export class SceneRenderer {
   // `inset` is the area the overlay panels cover, in CSS pixels.
   draw(frame, body, inset) {
     const { width, height } = fitCanvas(this.canvas, this.ctx);
-    this.camera.observe(frame);
-    this.camera.fit(width, height, pad(inset));
+    const guides = this.visible(frame.guides);
+    this.camera.observe(frame, guides);
+    this.camera.fit(width, height, pad(inset, this.room));
     if (!this.camera.ready) return;
 
     const px = (p) => this.camera.toPx(p);
-    const guides = [...frame.guides].sort(
-      (a, b) => (DEPTH[a.kind] ?? 0) - (DEPTH[b.kind] ?? 0),
-    );
+    guides.sort((a, b) => (DEPTH[a.kind] ?? 0) - (DEPTH[b.kind] ?? 0));
 
     const center = px(frame.body);
     for (const guide of guides) this.drawGuide(guide, px, center);
@@ -93,11 +116,19 @@ export class SceneRenderer {
       angle: -pose.angle,
     });
 
-    this.drawForces(frame.forces, seated, side);
+    if (this.forces) this.drawForces(frame.forces, seated, side);
   }
 
+  // The guides this renderer draws, in painting order.
+  visible(guides) {
+    return guides.filter((g) => this.annotations || !ANNOTATION.has(g.kind));
+  }
+
+  // Block side in px, a fraction of the smaller canvas dimension. A card is
+  // small enough that the stage fraction would bottom out at the clamp, so the
+  // preview asks for a bigger one.
   bodySize(width, height) {
-    return Math.max(18, Math.min(64, Math.min(width, height) * 0.07));
+    return Math.max(18, Math.min(64, Math.min(width, height) * this.bodyFraction));
   }
 
   drawGuide(guide, px, bodyPx) {
@@ -123,7 +154,7 @@ export class SceneRenderer {
       }
     }
 
-    if (guide.kind === "reference") {
+    if (guide.kind === "reference" && this.labels) {
       const at = labelAnchor(pts, bodyPx);
       label(this.ctx, guide.label, at.x, at.y, {
         color: COLOR.muted,

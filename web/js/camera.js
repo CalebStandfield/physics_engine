@@ -17,10 +17,12 @@ export class Camera {
     this.view = null; // what we are actually drawing with
   }
 
-  // Grow the fit box to hold every point in this frame.
-  observe(frame) {
+  // Grow the fit box to hold every point in this frame. `guides` defaults to
+  // all of them; a renderer that hides some passes the ones it actually draws,
+  // so the view does not leave room for lines nobody sees.
+  observe(frame, guides = frame.guides) {
     const pts = [frame.body];
-    for (const guide of frame.guides) pts.push(...guide.points);
+    for (const guide of guides) pts.push(...guide.points);
     if (pts.length === 0) return;
 
     let box = this.box ?? {

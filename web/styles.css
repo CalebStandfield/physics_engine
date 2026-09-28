@@ -8,13 +8,20 @@
   --line: #242932;
   --text: #e9e6e0;
   --muted: #8b919c;
+  /* Dimmer than --muted, for icons sitting on their own. Same value the
+     portfolio rail uses. */
+  --muted-dim: #565b66;
   --orange: #e8955c;
   --orange-dim: #a8683c;
 
   --font: ui-monospace, "JetBrains Mono", "SF Mono", SFMono-Regular, Menlo,
     Consolas, monospace;
 
-  --rail-h: 56px;
+  --rail-h: 68px;
+  /* Side gutter, about half an inch. The rail, the landing page and the
+     floating panels all sit on it, so nothing is off by a few pixels from the
+     row above it. */
+  --gutter: 96px;
   --radius: 10px;
 }
 
@@ -36,6 +43,16 @@ body {
   overflow: hidden;
 }
 
+/* ---------- icons ---------- */
+
+/* Phosphor glyph. Sized by the rule around it, colored by whatever it sits in. */
+.ph {
+  flex: none;
+  width: 1.15em;
+  height: 1.15em;
+  fill: currentColor;
+}
+
 /* ---------- top rail ---------- */
 
 .rail {
@@ -46,33 +63,46 @@ body {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  padding: 0 20px;
+  padding: 0 var(--gutter);
   background: var(--rail);
   border-bottom: 1px solid var(--line);
 }
 
+/* Explicit columns: the tabs are `display: none` on the landing page, and a
+   removed grid item would otherwise slide the links into the middle column. */
 .rail-left {
+  grid-column: 1;
   justify-self: start;
 }
 
 .rail-right {
+  grid-column: 3;
   justify-self: end;
   display: flex;
-  gap: 18px;
+  gap: 20px;
   align-items: center;
 }
 
+/* The brand is the only way back to the landing page, so it is a button, not a
+   link off the site. */
 .home {
+  appearance: none;
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  letter-spacing: 0.03em;
   color: var(--orange);
-  text-decoration: none;
+  cursor: pointer;
 }
 
-.home svg {
-  width: 18px;
-  height: 18px;
+.home .ph {
+  width: 20px;
+  height: 20px;
 }
 
 .home span {
@@ -83,35 +113,52 @@ body {
   color: var(--orange);
 }
 
+.home:hover .name,
+.home:hover .ph {
+  color: #f0a36a;
+}
+
+/* Bare filled icons, no box, muted until hovered. Same place in both views,
+   since the rail is shared, so they never move when a scenario opens. */
 .rail a.link {
-  color: var(--muted);
+  display: grid;
+  place-items: center;
+  color: var(--muted-dim);
   text-decoration: none;
-  font-size: 12px;
-  letter-spacing: 0.04em;
+  transition: color 0.14s ease;
+}
+
+.rail a.link .ph {
+  width: 22px;
+  height: 22px;
 }
 
 .rail a.link:hover {
   color: var(--orange);
 }
 
-/* scenario tabs */
-
+/* Scenario tabs. Hidden on the landing page, which is already the list. */
 .tabs {
+  grid-column: 2;
+  justify-self: center;
   display: flex;
   gap: 4px;
 }
 
 .tab {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  padding: 8px 14px;
+  padding: 10px 16px;
   cursor: pointer;
 }
 
@@ -122,6 +169,197 @@ body {
 .tab.active {
   color: var(--orange);
   border-bottom-color: var(--orange);
+}
+
+/* ---------- landing page ---------- */
+
+/* Title screen: the name centered over the dot grid, a warm glow behind it, and
+   the scenarios below as the thing you pick. */
+.landing {
+  position: fixed;
+  inset: var(--rail-h) 0 0 0;
+  overflow-y: auto;
+  background-color: var(--bg);
+  background-image: radial-gradient(
+      70% 50% at 50% 0%,
+      rgba(232, 149, 92, 0.1),
+      transparent 72%
+    ),
+    radial-gradient(var(--dot) 1px, transparent 1px);
+  background-size: auto, 24px 24px;
+  background-repeat: no-repeat, repeat;
+}
+
+/* Centered while it fits, top-aligned once the cards push it past one screen. */
+.landing-inner {
+  min-height: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 48px var(--gutter) 56px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.title {
+  text-align: center;
+}
+
+.kicker {
+  margin: 0 0 18px;
+  color: var(--orange-dim);
+  font-size: 11px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+}
+
+.landing h1 {
+  margin: 0;
+  font-size: clamp(38px, 7.5vw, 68px);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.landing h1 span {
+  color: var(--orange);
+}
+
+.tagline {
+  margin: 20px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+/* Three chips instead of a paragraph. Same facts, none of the wall. */
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.facts li {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(8, 9, 12, 0.5);
+}
+
+/* Labeled rule between the title and the cards. */
+.pick {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 46px 0 22px;
+}
+
+.pick-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.pick-label {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+}
+
+/* Auto-fit, so two scenarios sit side by side and four fall into a 2x2. */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 18px;
+}
+
+.card {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.14s ease, transform 0.14s ease;
+}
+
+.card:hover {
+  border-color: var(--orange-dim);
+  transform: translateY(-2px);
+}
+
+.card-view {
+  display: block;
+  width: 100%;
+  height: 168px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(8, 9, 12, 0.5);
+}
+
+.card-body {
+  padding: 14px 16px 16px;
+}
+
+.card-body h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.card:hover .card-body h2 {
+  color: var(--orange);
+}
+
+.card-body p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.card-coord {
+  color: var(--orange);
+  font-size: 11px;
+}
+
+.card-foot .ph {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  transition: color 0.14s ease, transform 0.14s ease;
+}
+
+.card:hover .card-foot .ph {
+  color: var(--orange);
+  transform: translateX(3px);
 }
 
 /* ---------- stage ---------- */
@@ -167,7 +405,7 @@ body {
    simple/advanced switch should only ever move its bottom edge. The top is
    where a full-height panel already sat, so advanced looks unchanged. */
 .panel-controls {
-  left: 20px;
+  left: var(--gutter);
   top: 20px;
   width: 290px;
   max-height: calc(100% - 40px);
@@ -180,7 +418,7 @@ body {
 .col-right {
   position: absolute;
   z-index: 20;
-  right: 20px;
+  right: var(--gutter);
   top: 20px;
   bottom: 20px;
   width: 290px;
@@ -274,11 +512,14 @@ body {
 
 .btn {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   font: inherit;
   font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  padding: 10px 22px;
+  padding: 10px 20px;
   border-radius: 8px;
   cursor: pointer;
   border: 1px solid var(--line);
@@ -301,6 +542,11 @@ body {
 .btn.primary:hover {
   background: #f0a36a;
   color: #17120d;
+}
+
+.btn .ph {
+  width: 14px;
+  height: 14px;
 }
 
 .btn[disabled] {
@@ -491,6 +737,10 @@ select:focus {
 
 /* Narrow desktops: give the scene room back by slimming the side panels. */
 @media (max-width: 1180px) {
+  :root {
+    --gutter: 28px;
+  }
+
   .panel-controls {
     width: 240px;
   }
