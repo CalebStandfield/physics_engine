@@ -20,6 +20,6 @@ pub use math::{Vec2, G};
 pub use params::{ParamError, ParamSpec, Tier};
 pub use record::Recorder;
 pub use sim::{Simulation, Snapshot};
-pub use scenario::{BodyPose, Derived, ForceVector, Frame, Guide, Scenario};
+pub use scenario::{BodyPose, Derivation, Derived, ForceVector, Frame, Guide, Scenario};
 pub use state::State;
 pub use system::System;

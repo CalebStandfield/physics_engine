@@ -7,7 +7,7 @@
 //! overrides on the way out (`with_label`, `with_default`), never a second
 //! range.
 
-use physics_core::params::{ParamSpec, Tier};
+use physics_core::params::{mark, Mark, ParamSpec, Tier};
 
 /// Shorthand so the table below reads as a table. One argument per `ParamSpec`
 /// field is the whole point here, so the arity lint does not apply.
@@ -31,8 +31,27 @@ const fn ctl(
         default,
         step,
         tier,
+        marks: &[],
     }
 }
+
+/// Landmarks shared by the controls below. Named so the table stays one line per
+/// control, and so two scenarios pointing at the same range point at the same
+/// values.
+static GRAVITY_MARKS: &[Mark] = &[
+    mark(1.62, "Moon"),
+    mark(3.72, "Mars"),
+    mark(physics_core::G, "Earth"),
+];
+static ANGLE_MARKS: &[Mark] = &[
+    mark(15.0, "15 deg"),
+    mark(30.0, "30 deg"),
+    mark(45.0, "45 deg, equal components"),
+    mark(60.0, "60 deg"),
+];
+static AT_REST: &[Mark] = &[mark(0.0, "At rest")];
+static EQUILIBRIUM: &[Mark] = &[mark(0.0, "Equilibrium")];
+static NO_FORCE: &[Mark] = &[mark(0.0, "No applied force")];
 
 /// Every control, in no particular order: the order a user sees is the order a
 /// scenario lists them in.
@@ -52,7 +71,8 @@ static CONTROLS: &[ParamSpec] = &[
         physics_core::G,
         0.01,
         Tier::Advanced,
-    ),
+    )
+    .with_marks(GRAVITY_MARKS),
     ctl(
         "initial_velocity",
         "Initial velocity",
@@ -62,7 +82,8 @@ static CONTROLS: &[ParamSpec] = &[
         0.0,
         0.05,
         Tier::Advanced,
-    ),
+    )
+    .with_marks(AT_REST),
     // Springs.
     ctl(
         "stiffness",
@@ -83,7 +104,8 @@ static CONTROLS: &[ParamSpec] = &[
         0.05,
         0.005,
         Tier::Basic,
-    ),
+    )
+    .with_marks(EQUILIBRIUM),
     ctl(
         "natural_length",
         "Natural length",
@@ -96,7 +118,8 @@ static CONTROLS: &[ParamSpec] = &[
     ),
     ctl("damping", "Damping", "N s/m", 0.0, 20.0, 0.0, 0.01, Tier::Advanced),
     // Ramps.
-    ctl("angle_deg", "Incline angle", "deg", 0.0, 89.0, 25.0, 0.5, Tier::Basic),
+    ctl("angle_deg", "Incline angle", "deg", 0.0, 89.0, 25.0, 0.5, Tier::Basic)
+        .with_marks(ANGLE_MARKS),
     ctl(
         "mu_static",
         "Static friction coefficient",
@@ -137,7 +160,8 @@ static CONTROLS: &[ParamSpec] = &[
         0.0,
         0.5,
         Tier::Advanced,
-    ),
+    )
+    .with_marks(NO_FORCE),
 ];
 
 /// Look up one control by key.
@@ -191,5 +215,19 @@ mod tests {
         assert_eq!(tuned.default, 0.25);
         assert_eq!(tuned.label, "Hanging mass");
         assert_eq!((tuned.min, tuned.max, tuned.step), (base.min, base.max, base.step));
+    }
+
+    #[test]
+    fn every_mark_sits_inside_its_range() {
+        for c in CONTROLS {
+            for m in c.marks {
+                assert!(
+                    c.min <= m.value && m.value <= c.max,
+                    "{} mark '{}' is outside its range",
+                    c.key,
+                    m.label
+                );
+            }
+        }
     }
 }

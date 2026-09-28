@@ -97,6 +97,22 @@ impl Frame {
     }
 }
 
+/// How a value was put together: the formula, in symbols, plus the terms it is
+/// built from.
+///
+/// The terms are `Derived` themselves, so a derivation is a tree: the normal
+/// force comes from the perpendicular weight component, which comes from the
+/// weight and the angle, which comes from the mass and gravity. It bottoms out
+/// at parameters and state, the numbers nothing else explains.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Derivation {
+    /// The formula in symbols, e.g. `"m g sin(theta)"`. Written with the
+    /// `symbol` of each term below, so the two read together.
+    pub equation: String,
+    /// The values the formula is built out of, in the order they appear in it.
+    pub terms: Vec<Derived>,
+}
+
 /// A computed quantity worth showing next to the animation: period, normal
 /// force, energy, and so on.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -108,6 +124,12 @@ pub struct Derived {
     /// Whether a short readout should show this row. Same split as the
     /// parameters, so one switch in the UI drives both.
     pub tier: Tier,
+    /// How this row is written in a formula, e.g. `"m"` or `"F_net"`. Empty for
+    /// a quantity with no standard symbol.
+    pub symbol: String,
+    /// Where the number came from, when it came from other numbers. `None` for a
+    /// parameter or a piece of state, which is where every chain ends.
+    pub from: Option<Derivation>,
 }
 
 impl Derived {
@@ -119,12 +141,31 @@ impl Derived {
             unit: unit.to_string(),
             value,
             tier: Tier::Basic,
+            symbol: String::new(),
+            from: None,
         }
     }
 
     /// Demote the row to the long readout.
     pub fn advanced(mut self) -> Self {
         self.tier = Tier::Advanced;
+        self
+    }
+
+    /// Name the symbol this quantity is written with in a formula.
+    pub fn sym(mut self, symbol: &str) -> Self {
+        self.symbol = symbol.to_string();
+        self
+    }
+
+    /// Say what the number is made of: the formula, and the terms in it. Each
+    /// term may carry its own derivation, which is what makes the readout able
+    /// to keep unfolding.
+    pub fn explain(mut self, equation: &str, terms: Vec<Derived>) -> Self {
+        self.from = Some(Derivation {
+            equation: equation.to_string(),
+            terms,
+        });
         self
     }
 }

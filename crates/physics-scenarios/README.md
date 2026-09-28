@@ -9,7 +9,7 @@ geometry, derived quantities. No time-stepping lives here.
 | --- | --- |
 | `src/spring.rs` | `SpringScenario`, `SpringParams`. Block hanging from a vertical spring. |
 | `src/incline.rs` | `InclineScenario`, `InclineParams`. Block on a ramp with friction. |
-| `src/controls.rs` | The control catalog: every slider any scenario can offer, with its range, step, unit and tier. `control(key)`, `all()`. |
+| `src/controls.rs` | The control catalog: every slider any scenario can offer, with its range, step, unit, tier and marks. `control(key)`, `all()`. |
 | `src/registry.rs` | id -> scenario factory. `ids()`, `create(id)`, `default_scenario()`. |
 | `examples/report.rs` | Prints engine numbers next to the hand calculation for both scenarios. Anything quoted in the write-up comes from here. `cargo run -p physics-scenarios --example report`. |
 | `tests/engine.rs` | End-to-end checks. The contract tests at the bottom loop over the registry, so a new scenario inherits them. |
@@ -53,10 +53,30 @@ both: `mass` is 0.01-100 kg everywhere, whoever is asking. Only the default and 
 per-scenario, through `with_default` and `with_label`. A registry test checks every schema entry
 still matches the catalog, so the ranges cannot drift apart again.
 
+A control can also carry marks, through `with_marks`: the values on its range worth pointing at,
+which the UI puts on the track as clickable ticks. Gravity marks the Moon, Mars and Earth, the
+incline angle marks 15/30/45/60 degrees, and the ranges that straddle zero mark it (at rest,
+equilibrium, no applied force). A test keeps every mark inside its own range.
+
 Each control also carries a `Tier`. Basic is the short list a simple panel shows (`mass`,
 `stiffness`, `initial_displacement`, `angle_deg`, `mu_static`, `mu_kinetic`); everything else,
 gravity and the initial-condition knobs included, is advanced. `Derived` rows carry the same
 tier, so one switch in the UI trims both panels.
+
+## Derivations
+
+Every derived row a scenario reports says how it was computed, through
+`Derived::explain(equation, terms)`: the formula in symbols and the values in it, each of which
+may carry its own formula. `a = F_net / m` opens onto the net force, which opens onto the
+weight component and friction, which open onto the mass, gravity and the angle, and it stops at
+parameters and state.
+
+Both scenarios build those trees in one block of small `*_term` methods, so the same node is
+written once and reused wherever it appears. The numbers in them come from the physics methods,
+never from a second copy of the formula, so a tree cannot drift from what is simulated.
+Friction's tree names whichever of its three cases is in effect (sliding, held, breaking loose),
+which is how the readout can say why the number is what it is. A contract test walks every tree
+in every scenario and checks that each formula names a symbol for every term under it.
 
 ## Adding a scenario
 

@@ -125,6 +125,117 @@ impl SpringScenario {
     fn body_position(&self, x: f64) -> Vec2 {
         Vec2::new(0.0, -(self.params.natural_length + x))
     }
+
+    // ---- derivation terms ----
+    //
+    // One method per node of the tree the readout unfolds. A parameter or a
+    // piece of state is a bare value; everything else names its formula and the
+    // terms under it, which are these same methods. The numbers come from the
+    // physics methods above, so the tree cannot drift from what is simulated.
+
+    fn mass_term(&self) -> Derived {
+        Derived::new("mass", "Mass", "kg", self.params.mass).sym("m")
+    }
+
+    fn gravity_term(&self) -> Derived {
+        Derived::new("gravity", "Gravity", "m/s^2", self.params.gravity).sym("g")
+    }
+
+    fn stiffness_term(&self) -> Derived {
+        Derived::new("stiffness", "Spring constant", "N/m", self.params.stiffness).sym("k")
+    }
+
+    fn damping_term(&self) -> Derived {
+        Derived::new("damping", "Damping", "N s/m", self.params.damping).sym("b")
+    }
+
+    fn natural_length_term(&self) -> Derived {
+        Derived::new("natural_length", "Natural length", "m", self.params.natural_length)
+            .sym("L_0")
+    }
+
+    fn stretch_term(&self, x: f64) -> Derived {
+        Derived::new("stretch", "Stretch past natural length", "m", x).sym("x")
+    }
+
+    fn velocity_term(&self, v: f64) -> Derived {
+        Derived::new("velocity", "Velocity (down +)", "m/s", v).sym("v")
+    }
+
+    fn weight_term(&self) -> Derived {
+        Derived::new("weight", "Weight", "N", self.weight())
+            .sym("W")
+            .explain("m g", vec![self.mass_term(), self.gravity_term()])
+    }
+
+    fn equilibrium_stretch_term(&self) -> Derived {
+        // The stretch at which the spring pulls back exactly as hard as gravity
+        // pulls down, so `k x0 = W`.
+        Derived::new("equilibrium_stretch", "Equilibrium stretch", "m", self.equilibrium_stretch())
+            .sym("x_0")
+            .explain("W / k", vec![self.weight_term(), self.stiffness_term()])
+    }
+
+    fn ideal_period_term(&self) -> Derived {
+        Derived::new("ideal_period", "Ideal period (undamped)", "s", self.ideal_period())
+            .sym("T")
+            .explain(
+                "2 pi sqrt(m / k)",
+                vec![self.mass_term(), self.stiffness_term()],
+            )
+    }
+
+    fn damping_ratio_term(&self) -> Derived {
+        Derived::new("damping_ratio", "Damping ratio", "", self.damping_ratio())
+            .sym("z")
+            .explain(
+                "b / (2 sqrt(m k))",
+                vec![self.damping_term(), self.mass_term(), self.stiffness_term()],
+            )
+    }
+
+    /// Height of the block, measured from the ceiling anchor, m. Negative, since
+    /// the block hangs below it.
+    fn height_term(&self, x: f64) -> Derived {
+        Derived::new("height", "Height below the anchor", "m", self.body_position(x).y)
+            .sym("y")
+            .explain(
+                "-(L_0 + x)",
+                vec![self.natural_length_term(), self.stretch_term(x)],
+            )
+    }
+
+    fn kinetic_energy_term(&self, state: &State) -> Derived {
+        Derived::new("kinetic_energy", "Kinetic energy", "J", state.kinetic_energy(self.params.mass))
+            .sym("KE")
+            .explain(
+                "m v^2 / 2",
+                vec![self.mass_term(), self.velocity_term(state.v)],
+            )
+    }
+
+    fn spring_energy_term(&self, x: f64) -> Derived {
+        Derived::new("spring_energy", "Spring energy", "J", 0.5 * self.params.stiffness * x * x)
+            .sym("PE_spring")
+            .explain(
+                "k x^2 / 2",
+                vec![self.stiffness_term(), self.stretch_term(x)],
+            )
+    }
+
+    fn gravitational_energy_term(&self, x: f64) -> Derived {
+        Derived::new(
+            "gravitational_energy",
+            "Gravitational energy",
+            "J",
+            self.params.mass * self.params.gravity * self.body_position(x).y,
+        )
+        .sym("PE_grav")
+        .explain(
+            "m g y",
+            vec![self.mass_term(), self.gravity_term(), self.height_term(x)],
+        )
+    }
 }
 
 impl Default for SpringScenario {
@@ -259,56 +370,63 @@ impl Scenario for SpringScenario {
     }
 
     fn derived(&self, state: &State) -> Vec<Derived> {
-        let m = self.params.mass;
-        let k = self.params.stiffness;
-        let x0 = self.equilibrium_stretch();
-        let kinetic = state.kinetic_energy(m);
-        let spring_pe = 0.5 * k * state.x * state.x;
-        // Height measured from the anchor, so the block's y is negative.
-        let grav_pe = m * self.params.gravity * self.body_position(state.x).y;
-
         let mut out = vec![
-            Derived::new("equilibrium_stretch", "Equilibrium stretch", "m", x0).advanced(),
+            self.equilibrium_stretch_term().advanced(),
             Derived::new(
                 "displacement",
                 "Displacement from equilibrium",
                 "m",
-                state.x - x0,
+                state.x - self.equilibrium_stretch(),
+            )
+            .sym("u")
+            .explain(
+                "x - x_0",
+                vec![self.stretch_term(state.x), self.equilibrium_stretch_term()],
             ),
-            Derived::new(
-                "ideal_period",
-                "Ideal period (undamped)",
-                "s",
-                self.ideal_period(),
-            ),
-            Derived::new(
-                "spring_force",
-                "Spring force",
-                "N",
-                self.spring_force(state.x),
-            ),
-            Derived::new("weight", "Weight", "N", self.weight()).advanced(),
-            Derived::new("kinetic_energy", "Kinetic energy", "J", kinetic).advanced(),
-            Derived::new("spring_energy", "Spring energy", "J", spring_pe).advanced(),
-            Derived::new("gravitational_energy", "Gravitational energy", "J", grav_pe).advanced(),
+            self.ideal_period_term(),
+            Derived::new("spring_force", "Spring force", "N", self.spring_force(state.x))
+                .sym("F_spring")
+                .explain(
+                    "-k x",
+                    vec![self.stiffness_term(), self.stretch_term(state.x)],
+                ),
+            self.weight_term().advanced(),
+            self.kinetic_energy_term(state).advanced(),
+            self.spring_energy_term(state.x).advanced(),
+            self.gravitational_energy_term(state.x).advanced(),
             Derived::new(
                 "mechanical_energy",
                 "Total mechanical energy",
                 "J",
-                kinetic + spring_pe + grav_pe,
+                state.kinetic_energy(self.params.mass)
+                    + 0.5 * self.params.stiffness * state.x * state.x
+                    + self.params.mass * self.params.gravity * self.body_position(state.x).y,
+            )
+            .sym("E")
+            .explain(
+                "KE + PE_spring + PE_grav",
+                vec![
+                    self.kinetic_energy_term(state),
+                    self.spring_energy_term(state.x),
+                    self.gravitational_energy_term(state.x),
+                ],
             )
             .advanced(),
         ];
 
         if self.params.damping > 0.0 {
-            out.push(
-                Derived::new("damping_ratio", "Damping ratio", "", self.damping_ratio()).advanced(),
-            );
+            out.push(self.damping_ratio_term().advanced());
             // Damping stretches the period, so the undamped formula is not
             // what a stopwatch would read here.
             if let Some(damped) = self.damped_period() {
                 out.push(
-                    Derived::new("damped_period", "Damped period", "s", damped).advanced(),
+                    Derived::new("damped_period", "Damped period", "s", damped)
+                        .sym("T_d")
+                        .explain(
+                            "T / sqrt(1 - z^2)",
+                            vec![self.ideal_period_term(), self.damping_ratio_term()],
+                        )
+                        .advanced(),
                 );
             }
         }

@@ -2,8 +2,8 @@
 // names a scenario or a parameter, so a new scenario gets a full control panel
 // for free.
 
-import { num, unitSuffix } from "./format.js";
 import { shows } from "./mode.js";
+import { sliderRow } from "./slider.js";
 
 // Parameters that only take effect when the run restarts.
 const RESET_ONLY = /^initial_/;
@@ -26,50 +26,21 @@ export function buildControls(root, sim, mode, onChange) {
 }
 
 function paramRow(spec, sim, onChange) {
-  const wrap = document.createElement("div");
-  wrap.className = "ctl";
-
-  const head = document.createElement("div");
-  head.className = "ctl-head";
-
-  const left = document.createElement("span");
-  left.className = "ctl-label";
-  left.textContent = spec.label;
-  head.append(left);
+  const row = sliderRow(spec, {
+    get: () => sim.getParam(spec.key) ?? spec.default,
+    set: (v) => sim.setParam(spec.key, v),
+    onChange: () => onChange(spec.key),
+  });
 
   if (RESET_ONLY.test(spec.key)) {
     const tag = document.createElement("span");
     tag.className = "ctl-tag";
     tag.textContent = "on reset";
     tag.title = "Applies the next time you press Reset";
-    left.append(" ", tag);
+    row.label.append(" ", tag);
   }
 
-  const value = document.createElement("span");
-  value.className = "ctl-value";
-  head.append(value);
-
-  const slider = document.createElement("input");
-  slider.type = "range";
-  slider.min = spec.min;
-  slider.max = spec.max;
-  slider.step = spec.step;
-  slider.value = sim.getParam(spec.key) ?? spec.default;
-
-  const show = (v) => {
-    value.textContent = num(v, spec.step) + unitSuffix(spec.unit);
-  };
-  show(Number(slider.value));
-
-  slider.addEventListener("input", () => {
-    const v = Number(slider.value);
-    sim.setParam(spec.key, v);
-    show(v);
-    onChange(spec.key);
-  });
-
-  wrap.append(head, slider);
-  return wrap;
+  return row.el;
 }
 
 export function buildSolver(root, sim) {

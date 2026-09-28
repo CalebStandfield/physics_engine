@@ -23,6 +23,9 @@
      row above it. */
   --gutter: 96px;
   --radius: 10px;
+  /* Slider thumb. The mark ticks under a track are positioned against it, so
+     the two have to agree. */
+  --thumb: 13px;
 }
 
 * {
@@ -445,27 +448,71 @@ body {
   overflow-y: auto;
 }
 
-/* thin scrollbars inside panels */
+/* A panel taller than the room it has still scrolls, it just does not say so:
+   the bar sat inside the padding and shifted the rows under it every time the
+   simple/advanced switch moved. */
 
-.panel::-webkit-scrollbar {
-  width: 6px;
+.panel {
+  scrollbar-width: none;
 }
 
-.panel::-webkit-scrollbar-thumb {
-  background: var(--line);
-  border-radius: 3px;
+.panel::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- panel head ---------- */
+
+/* The switch on the left, the panel's own action on the right. */
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+/* One icon button, whatever the panel it sits in wants done. Square, so two
+   panels' actions line up regardless of which glyph is in them. */
+.panel-act {
+  appearance: none;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font: inherit;
+  color: var(--muted);
+  background: rgba(8, 9, 12, 0.55);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.panel-act .ph {
+  width: 15px;
+  height: 15px;
+}
+
+.panel-act:hover {
+  color: var(--orange);
+  border-color: var(--orange-dim);
+}
+
+.panel-act.active {
+  color: #17120d;
+  background: var(--orange);
+  border-color: var(--orange);
 }
 
 /* ---------- simple | advanced switch ---------- */
 
-/* One switch per panel, both driving the same mode. A segmented control:
-   centered above the panel's own heading, equal halves so the active chip does
-   not resize as it moves, and the same orange-on-dark the primary button uses. */
+/* One switch per panel, both driving the same mode. A segmented control: equal
+   halves so the active chip does not resize as it moves, and the same
+   orange-on-dark the primary button uses. */
 .mode {
   display: flex;
   gap: 3px;
-  width: fit-content;
-  margin: 0 auto 14px;
   padding: 3px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -474,7 +521,8 @@ body {
 
 .mode-btn {
   appearance: none;
-  min-width: 84px;
+  flex: 1;
+  min-width: 0;
   font: inherit;
   font-size: 10px;
   letter-spacing: 0.16em;
@@ -603,14 +651,81 @@ body {
   padding: 1px 5px;
 }
 
+/* The value is an input, not a label: type an exact number or drag for it. Sized
+   to the widest number a control shows rather than to its content, so the label
+   beside it does not reflow while you drag. */
 .ctl-value {
-  color: var(--orange);
+  width: 84px;
+  flex: none;
+  font: inherit;
   font-size: 12px;
-  white-space: nowrap;
+  text-align: right;
+  color: var(--orange);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ctl-value:hover {
+  border-color: var(--line);
+}
+
+.ctl-value:focus {
+  outline: none;
+  border-color: var(--orange-dim);
+  background: rgba(8, 9, 12, 0.55);
+}
+
+/* Landmarks on a track: the values worth hitting exactly, each one clickable.
+   The row overlaps the slider it belongs to, so the ticks sit against the track
+   instead of taking a line of their own. */
+.ctl-marks {
+  position: relative;
+  height: 9px;
+  margin-top: -3px;
+}
+
+.ctl-mark {
+  appearance: none;
+  position: absolute;
+  top: 0;
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  transform: translateX(-50%);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* The tick itself, so the button around it stays big enough to click. */
+.ctl-mark::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  width: 1px;
+  height: 5px;
+  transform: translateX(-50%);
+  background: var(--muted-dim);
+}
+
+.ctl-mark:hover::before,
+.ctl-mark.hit::before {
+  background: var(--orange);
+}
+
+.ctl-mark.hit::before {
+  width: 2px;
 }
 
 input[type="range"] {
   appearance: none;
+  /* Chrome gives a range 2px of side margin, which would leave the track and the
+     marks under it measuring from different edges. */
+  margin: 0;
   width: 100%;
   height: 3px;
   background: var(--line);
@@ -620,16 +735,16 @@ input[type="range"] {
 
 input[type="range"]::-webkit-slider-thumb {
   appearance: none;
-  width: 13px;
-  height: 13px;
+  width: var(--thumb);
+  height: var(--thumb);
   border-radius: 50%;
   background: var(--orange);
   cursor: pointer;
 }
 
 input[type="range"]::-moz-range-thumb {
-  width: 13px;
-  height: 13px;
+  width: var(--thumb);
+  height: var(--thumb);
   border: none;
   border-radius: 50%;
   background: var(--orange);
@@ -652,6 +767,14 @@ select:focus {
   border-color: var(--orange-dim);
 }
 
+/* A line of explanation under a control, not a value. */
+.note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
 .divider {
   height: 1px;
   background: var(--line);
@@ -660,29 +783,90 @@ select:focus {
 
 /* ---------- readouts ---------- */
 
+/* A flat list, not a grid: a row unfolds into its formula and its terms, and
+   those are siblings indented by `--depth`, so nesting never needs a box. */
 .rows {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 4px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   font-size: 12px;
 }
 
-.rows .k {
+.rows .row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 0 0 calc(var(--depth, 0) * 11px);
+  /* A row is a <button> when it can unfold; strip what that brings with it. */
+  margin: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  width: 100%;
+}
+
+.rows button.row {
+  cursor: pointer;
+}
+
+.rows .row .k {
+  flex: 1;
+  min-width: 0;
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.rows .v {
+.rows button.row:hover .k {
+  color: var(--text);
+}
+
+.rows .row .v {
   color: var(--orange);
-  text-align: right;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
-.rows .v .u {
+.rows .row .v .u {
   color: var(--muted);
+}
+
+/* The chevron turns rather than swapping for a second glyph. */
+.rows .row .ph {
+  width: 0.85em;
+  height: 0.85em;
+  color: var(--muted-dim);
+  transition: transform 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Stands in for a chevron on a row that has nothing to unfold. */
+.rows .twist-gap {
+  flex: none;
+  width: 0.85em;
+}
+
+.rows .row.open .ph {
+  transform: rotate(90deg);
+}
+
+.rows button.row:hover .ph {
+  color: var(--orange);
+}
+
+/* The formula the terms under it add up to. Wraps rather than clipping: a
+   formula cut off at the panel edge is no formula. */
+.rows .eq {
+  padding-left: calc(var(--depth, 0) * 11px);
+  color: var(--muted-dim);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.rows .sym {
+  color: var(--orange-dim);
 }
 
 /* ---------- legend ---------- */
@@ -751,5 +935,9 @@ select:focus {
 
   #fbd {
     height: 160px;
+  }
+
+  .ctl-value {
+    width: 72px;
   }
 }

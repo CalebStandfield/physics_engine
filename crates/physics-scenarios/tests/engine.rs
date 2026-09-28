@@ -5,7 +5,7 @@
 
 use physics_core::analysis::percent_difference;
 use physics_core::integrator;
-use physics_core::scenario::Scenario;
+use physics_core::scenario::{Derived, Scenario};
 use physics_core::sim::Simulation;
 use physics_core::state::State;
 use physics_scenarios::registry;
@@ -354,4 +354,57 @@ fn a_hanging_spring_has_no_pose() {
     let pose = s.frame(&s.initial_state()).pose;
     assert_eq!(pose.angle, 0.0);
     assert_eq!(pose.support, physics_core::math::Vec2::ZERO);
+}
+
+/// Walks one derived row's tree, checking that every step is readable: a
+/// formula, the terms it names, and a symbol per term so the two line up.
+fn check_derivation(id: &str, row: &Derived, depth: usize) {
+    assert!(depth < 12, "{id}: {} nests suspiciously deep", row.key);
+    assert!(row.value.is_finite(), "{id}: {} is not finite", row.key);
+
+    let Some(from) = &row.from else { return };
+    assert!(!from.equation.is_empty(), "{id}: {} explains nothing", row.key);
+    assert!(!from.terms.is_empty(), "{id}: {} has no terms", row.key);
+
+    for (i, term) in from.terms.iter().enumerate() {
+        assert!(
+            !from.terms[..i].iter().any(|other| other.key == term.key),
+            "{id}: {} lists '{}' twice",
+            row.key,
+            term.key
+        );
+        assert!(
+            !term.symbol.is_empty(),
+            "{id}: term '{}' under {} has no symbol",
+            term.key,
+            row.key
+        );
+        assert!(
+            from.equation.contains(&term.symbol),
+            "{id}: {} = '{}' never uses '{}'",
+            row.key,
+            from.equation,
+            term.symbol
+        );
+        check_derivation(id, term, depth + 1);
+    }
+}
+
+#[test]
+fn every_derived_row_explains_itself_all_the_way_down() {
+    for id in registry::ids() {
+        let s = registry::create(id).unwrap();
+        let start = s.initial_state();
+        // Three states, since the branch friction takes changes the tree: at
+        // rest, sliding one way, sliding the other.
+        for state in [
+            start,
+            State::new(0.3, start.x + 0.1, 0.7),
+            State::new(0.6, start.x - 0.1, -0.7),
+        ] {
+            for row in s.derived(&state) {
+                check_derivation(id, &row, 0);
+            }
+        }
+    }
 }

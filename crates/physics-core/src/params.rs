@@ -15,6 +15,24 @@ pub enum Tier {
     Advanced,
 }
 
+/// A value on a control's range worth pointing at: a landmark, not a limit.
+///
+/// Earth gravity on the gravity slider, 45 degrees on a ramp. The UI marks these
+/// on the track so they are easy to hit exactly. Naming what is notable about a
+/// range is the scenario's job, not the frontend's, which is why they live here.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Mark {
+    /// Where on the range it sits.
+    pub value: f64,
+    /// What is notable about it, e.g. `"Earth"`. Shown on hover.
+    pub label: &'static str,
+}
+
+/// One mark, for a table that reads as a table.
+pub const fn mark(value: f64, label: &'static str) -> Mark {
+    Mark { value, label }
+}
+
 /// Everything a UI needs to render one input, and the engine needs to validate
 /// it. Const-constructible so scenarios can declare their table as a `static`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -35,6 +53,11 @@ pub struct ParamSpec {
     pub step: f64,
     /// Whether a simple panel should show this one.
     pub tier: Tier,
+    /// Values on the range worth marking. Empty for a range with no landmarks.
+    /// Write-only across serde: a spec read back in comes with no marks, since a
+    /// borrowed slice cannot outlive the input it was read from.
+    #[serde(skip_deserializing)]
+    pub marks: &'static [Mark],
 }
 
 impl ParamSpec {
@@ -49,6 +72,12 @@ impl ParamSpec {
     /// scenario, e.g. which way is positive.
     pub const fn with_label(mut self, label: &'static str) -> Self {
         self.label = label;
+        self
+    }
+
+    /// Same control, with landmarks on its track.
+    pub const fn with_marks(mut self, marks: &'static [Mark]) -> Self {
+        self.marks = marks;
         self
     }
 }
@@ -182,6 +211,7 @@ mod tests {
             default,
             step: 0.1,
             tier: Tier::Basic,
+            marks: &[],
         }
     }
 

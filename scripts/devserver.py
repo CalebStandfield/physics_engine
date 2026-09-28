@@ -9,10 +9,14 @@ after every edit:
     generously for ES modules and wasm. A rebuild then does not show up until a
     hard reload, which looks exactly like the build being broken.
   - .wasm is served as application/wasm, which streaming compilation needs.
+  - A path that names no file falls back to index.html, so the scenario routes
+    (`/incline`, `/spring`) survive a reload. Any other host serving this needs
+    the same fallback.
 
 Usage: devserver.py PORT DIRECTORY
 """
 
+import os
 import sys
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -25,6 +29,16 @@ class DevHandler(SimpleHTTPRequestHandler):
         ".mjs": "text/javascript",
         ".wasm": "application/wasm",
     }
+
+    # One page, several URLs. A request for a real file is served as usual; a
+    # request for anything else without a file extension is a route, and gets
+    # the page. Anything with an extension stays a 404, so a missing asset still
+    # looks like a missing asset rather than a page full of HTML.
+    def send_head(self):
+        path = self.translate_path(self.path)
+        if not os.path.exists(path) and not os.path.splitext(self.path)[1]:
+            self.path = "/index.html"
+        return super().send_head()
 
     def end_headers(self):
         # no-store rather than no-cache: do not keep a copy at all, so there is

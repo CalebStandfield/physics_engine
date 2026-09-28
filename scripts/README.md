@@ -6,7 +6,7 @@ Build and serve. `run.sh` at the project root is the single entry point and call
 | --- | --- |
 | `common.sh` | Sourced, not run. Sets `ROOT`, `WASM_CRATE`, `WEB_DIR`, `PKG_DIR`, `PORT` (default 8080). Helpers `die` and `need`. |
 | `build.sh` | `wasm-pack build crates/physics-wasm --target web` into `web/pkg`, out-name `physics_wasm`. Extra args pass through (e.g. `--dev`). Needs `wasm-pack`. |
-| `devserver.py` | The static file server itself. `http.server` plus `Cache-Control: no-store` and `application/wasm`. `devserver.py PORT DIRECTORY`. |
+| `devserver.py` | The static file server itself. `http.server` plus `Cache-Control: no-store`, `application/wasm`, and an `index.html` fallback for the scenario routes. `devserver.py PORT DIRECTORY`. |
 | `serve.sh` | Runs `devserver.py` on `$PORT` over `web`, in the foreground or in the background. Fails if `web/pkg` is empty. Takes `start`, `stop` or `status`; no argument means foreground. |
 
 ES modules need a real origin, so `file://` will not work. Serve it.
@@ -18,6 +18,11 @@ how long a file stays fresh, and Chrome guesses generously for ES modules and wa
 rebuild does not show up: the page keeps running the old `web/js/*.js` and the old
 `web/pkg/*.wasm` while the new ones sit on disk being served to anything that asks. It looks
 exactly like a broken build. `devserver.py` sends `no-store`, so there is no copy to go stale.
+
+The frontend puts the current scenario in the URL (`/incline`, `/spring`), so a path that names
+no file and has no extension is served `index.html` rather than a 404. A path with an extension
+still 404s, so a missing asset looks like a missing asset. Any other host serving `web/` needs
+the same fallback.
 
 A copy already cached under the old headers survives a normal reload, and a restart of the
 server does nothing about it, because the page never asks. Clear it once with a hard reload

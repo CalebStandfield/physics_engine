@@ -184,6 +184,145 @@ impl InclineScenario {
     fn past_end(&self, x: f64) -> bool {
         x >= self.params.length
     }
+
+    // ---- derivation terms ----
+    //
+    // One method per node of the tree the readout unfolds. A parameter or a
+    // piece of state is a bare value; everything else names its formula and the
+    // terms under it, which are these same methods. Every number still comes
+    // from the physics methods above, so the tree cannot drift from what is
+    // being simulated.
+
+    fn mass_term(&self) -> Derived {
+        Derived::new("mass", "Mass", "kg", self.params.mass).sym("m")
+    }
+
+    fn gravity_term(&self) -> Derived {
+        Derived::new("gravity", "Gravity", "m/s^2", self.params.gravity).sym("g")
+    }
+
+    fn angle_term(&self) -> Derived {
+        Derived::new("angle_deg", "Incline angle", "deg", self.params.angle_deg).sym("theta")
+    }
+
+    fn mu_static_term(&self) -> Derived {
+        Derived::new("mu_static", "Static friction coefficient", "", self.params.mu_static)
+            .sym("mu_s")
+    }
+
+    fn mu_kinetic_term(&self) -> Derived {
+        Derived::new("mu_kinetic", "Kinetic friction coefficient", "", self.params.mu_kinetic)
+            .sym("mu_k")
+    }
+
+    fn applied_term(&self) -> Derived {
+        Derived::new("applied_force", "Applied force", "N", self.params.applied_force)
+            .sym("F_app")
+    }
+
+    fn velocity_term(&self, v: f64) -> Derived {
+        Derived::new("velocity", "Velocity along slope", "m/s", v).sym("v")
+    }
+
+    fn weight_term(&self) -> Derived {
+        Derived::new("weight", "Weight", "N", self.weight())
+            .sym("W")
+            .explain("m g", vec![self.mass_term(), self.gravity_term()])
+    }
+
+    fn gravity_parallel_term(&self) -> Derived {
+        Derived::new("gravity_parallel", "Gravity along slope", "N", self.gravity_parallel())
+            .sym("W_par")
+            .explain("W sin(theta)", vec![self.weight_term(), self.angle_term()])
+    }
+
+    fn gravity_perpendicular_term(&self) -> Derived {
+        Derived::new(
+            "gravity_perpendicular",
+            "Gravity into slope",
+            "N",
+            self.gravity_perpendicular(),
+        )
+        .sym("W_perp")
+        .explain("W cos(theta)", vec![self.weight_term(), self.angle_term()])
+    }
+
+    fn normal_term(&self) -> Derived {
+        // Nothing accelerates the block off the surface, so the surface pushes
+        // back with exactly the perpendicular piece of the weight.
+        Derived::new("normal_force", "Normal force", "N", self.normal_force())
+            .sym("N")
+            .explain("W_perp", vec![self.gravity_perpendicular_term()])
+    }
+
+    fn max_static_friction_term(&self) -> Derived {
+        Derived::new(
+            "max_static_friction",
+            "Static friction limit",
+            "N",
+            self.max_static_friction(),
+        )
+        .sym("f_max")
+        .explain("mu_s N", vec![self.mu_static_term(), self.normal_term()])
+    }
+
+    fn drive_term(&self) -> Derived {
+        Derived::new("drive_force", "Drive along slope", "N", self.drive_force())
+            .sym("F_drive")
+            .explain(
+                "W_par + F_app",
+                vec![self.gravity_parallel_term(), self.applied_term()],
+            )
+    }
+
+    /// Friction, with whichever of the three cases is actually in effect. The
+    /// formula shown is the branch `friction_force` took, so the readout says
+    /// why the number is what it is.
+    fn friction_term(&self, v: f64) -> Derived {
+        let row = Derived::new("friction_force", "Friction force", "N", self.friction_force(v))
+            .sym("f");
+
+        if v.abs() > REST_SPEED {
+            row.explain(
+                "-sign(v) mu_k N",
+                vec![self.velocity_term(v), self.mu_kinetic_term(), self.normal_term()],
+            )
+        } else if self.holds_at_rest() {
+            // Held: friction is whatever cancels the drive, not mu times N.
+            row.explain(
+                "-F_drive, since |F_drive| <= f_max",
+                vec![self.drive_term(), self.max_static_friction_term()],
+            )
+        } else {
+            row.explain(
+                "-sign(F_drive) mu_k N, since |F_drive| > f_max",
+                vec![
+                    self.drive_term(),
+                    self.max_static_friction_term(),
+                    self.mu_kinetic_term(),
+                    self.normal_term(),
+                ],
+            )
+        }
+    }
+
+    fn net_force_term(&self, v: f64) -> Derived {
+        Derived::new(
+            "net_force",
+            "Net force along slope",
+            "N",
+            self.drive_force() + self.friction_force(v),
+        )
+        .sym("F_net")
+        .explain(
+            "W_par + F_app + f",
+            vec![
+                self.gravity_parallel_term(),
+                self.applied_term(),
+                self.friction_term(v),
+            ],
+        )
+    }
 }
 
 impl Default for InclineScenario {
@@ -314,47 +453,37 @@ impl Scenario for InclineScenario {
     }
 
     fn derived(&self, state: &State) -> Vec<Derived> {
-        let friction = self.friction_force(state.v);
-        let net = self.net_force(state.x, state.v, state.t);
         let sliding = state.v.abs() > REST_SPEED;
 
         vec![
-            Derived::new("weight", "Weight", "N", self.weight()),
-            Derived::new(
-                "gravity_parallel",
-                "Gravity along slope",
-                "N",
-                self.gravity_parallel(),
-            )
-            .advanced(),
-            Derived::new(
-                "gravity_perpendicular",
-                "Gravity into slope",
-                "N",
-                self.gravity_perpendicular(),
-            )
-            .advanced(),
-            Derived::new("normal_force", "Normal force", "N", self.normal_force()),
-            Derived::new("friction_force", "Friction force", "N", friction),
-            Derived::new(
-                "max_static_friction",
-                "Static friction limit",
-                "N",
-                self.max_static_friction(),
-            )
-            .advanced(),
-            Derived::new("net_force", "Net force along slope", "N", net),
+            self.weight_term(),
+            self.gravity_parallel_term().advanced(),
+            self.gravity_perpendicular_term().advanced(),
+            self.normal_term(),
+            self.friction_term(state.v),
+            self.max_static_friction_term().advanced(),
+            self.net_force_term(state.v),
             Derived::new(
                 "acceleration",
                 "Acceleration along slope",
                 "m/s^2",
-                net / self.params.mass,
+                self.net_force(state.x, state.v, state.t) / self.params.mass,
+            )
+            .sym("a")
+            .explain(
+                "F_net / m",
+                vec![self.net_force_term(state.v), self.mass_term()],
             ),
             Derived::new(
                 "ideal_sliding_accel",
                 "Textbook sliding acceleration",
                 "m/s^2",
                 self.ideal_sliding_accel(),
+            )
+            .sym("a_ideal")
+            .explain(
+                "g (sin(theta) - mu_k cos(theta))",
+                vec![self.gravity_term(), self.angle_term(), self.mu_kinetic_term()],
             )
             .advanced(),
             Derived::new(
@@ -363,12 +492,25 @@ impl Scenario for InclineScenario {
                 "J",
                 state.kinetic_energy(self.params.mass),
             )
+            .sym("KE")
+            .explain(
+                "m v^2 / 2",
+                vec![self.mass_term(), self.velocity_term(state.v)],
+            )
             .advanced(),
             Derived::new(
                 "distance_remaining",
                 "Distance left on ramp",
                 "m",
                 (self.params.length - state.x).max(0.0),
+            )
+            .sym("L - x")
+            .explain(
+                "L - x",
+                vec![
+                    Derived::new("length", "Ramp length", "m", self.params.length).sym("L"),
+                    Derived::new("position", "Distance down the slope", "m", state.x).sym("x"),
+                ],
             )
             .advanced(),
             Derived::new("sliding", "Sliding", "", if sliding { 1.0 } else { 0.0 }).advanced(),

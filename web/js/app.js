@@ -13,8 +13,10 @@ import { SIMPLE, buildModeToggle, setActiveMode } from "./ui/mode.js";
 import { resizeAround } from "./ui/accordion.js";
 import { buildLegend } from "./ui/legend.js";
 import { Readout } from "./ui/readout.js";
+import { buildTimeScale } from "./ui/timescale.js";
 import { overlayInset } from "./ui/inset.js";
 import { hydrateIcons } from "./ui/icons.js";
+import { readRoute, setRoute, onRoute } from "./router.js";
 
 const el = (id) => document.getElementById(id);
 
@@ -34,7 +36,11 @@ async function main() {
   const camera = new Camera();
   const scene = new SceneRenderer(el("scene"), camera);
   const fbd = new FbdRenderer(el("fbd"));
-  const readout = new Readout(el("readout"));
+  // The readout folds rows open, which changes the panel's height; hand it the
+  // same tween the mode switch uses.
+  const readout = new Readout(el("readout"), (change) =>
+    resizeAround(el("panel-fbd"), change),
+  );
 
   // How much of each panel is on screen. One mode per panel: trimming the
   // controls should not also trim the readout. Page state, so both survive a
@@ -44,12 +50,19 @@ async function main() {
   // The mass slider's range, which sets how thick the block's border gets drawn.
   let massRange = sim.spec("mass");
 
+  // The control panel, redrawn from whatever the engine currently holds. Called
+  // on its own when the values changed under the panel (a reset) rather than the
+  // scenario changing.
+  const refreshControls = () => {
+    buildControls(el("controls"), sim, mode.controls, () => {});
+    el("solver-block").classList.toggle("hidden", mode.controls === SIMPLE);
+  };
+
   const rebuild = () => {
     camera.reset();
     massRange = sim.spec("mass");
-    buildControls(el("controls"), sim, mode.controls, () => {});
+    refreshControls();
     buildSolver(el("solver"), sim);
-    el("solver-block").classList.toggle("hidden", mode.controls === SIMPLE);
     setCaption(el("caption"), sim.entry);
   };
 
@@ -68,37 +81,71 @@ async function main() {
     readout.update(sim, mode.readout),
   );
 
+  // Every control back to its declared default. The run keeps going: this is the
+  // panel resetting, not the clock.
+  el("btn-reset-controls").addEventListener("click", () => {
+    sim.resetParams();
+    refreshControls();
+  });
+
+  // The right-hand panel shows one of two things above the readout: the free
+  // body diagram, or the speed control. The clock is the switch.
+  let showingTime = false;
+
+  el("btn-clock").addEventListener("click", () => {
+    showingTime = !showingTime;
+    el("btn-clock").classList.toggle("active", showingTime);
+    el("btn-clock").title = showingTime
+      ? "Swap the speed control for the diagram"
+      : "Swap the diagram for the speed control";
+    resizeAround(el("panel-fbd"), () => {
+      el("view-fbd").classList.toggle("hidden", showingTime);
+      el("view-time").classList.toggle("hidden", !showingTime);
+      if (showingTime) buildTimeScale(el("timescale"), sim);
+    });
+  });
+
   const transport = (running) => {
     sim.running = running;
     el("btn-start").disabled = running;
     el("btn-stop").disabled = !running;
   };
 
-  // Landing page first, the stage once a scenario is picked. Two views, so a
-  // flag rather than a router.
+  // The scenario list, or one scenario. Which one is in the URL, so a scenario
+  // can be linked to and the back button works.
+  const ids = sim.catalog.map((e) => e.id);
   let onStage = false;
 
-  const show = (stage) => {
-    onStage = stage;
-    el("stage").classList.toggle("hidden", !stage);
-    el("home").classList.toggle("hidden", stage);
-    el("tabs").classList.toggle("hidden", !stage);
-    if (!stage) drawPreviews();
-  };
+  // `id` is the scenario to show, or null for the list. Leaving a scenario
+  // pauses it, same rule as switching between two.
+  const show = (id) => {
+    onStage = Boolean(id);
 
-  const open = (id) => {
-    if (id !== sim.id) sim.loadScenario(id);
-    setActiveTab(el("tabs"), sim.catalog, id);
+    if (id) {
+      if (id !== sim.id) sim.loadScenario(id);
+      setActiveTab(el("tabs"), sim.catalog, id);
+      rebuild();
+    }
+
     // The engine pauses on a swap; keep the buttons saying so.
     transport(false);
-    rebuild();
-    show(true);
+    el("stage").classList.toggle("hidden", !onStage);
+    el("home").classList.toggle("hidden", onStage);
+    el("tabs").classList.toggle("hidden", !onStage);
+    if (!onStage) drawPreviews();
   };
 
-  buildTabs(el("tabs"), sim.catalog, sim.id, (id) => {
-    if (id === sim.id) return;
-    open(id);
-  });
+  // Same, plus a history entry. Everything the user clicks goes through here;
+  // `show` on its own is for the URL already having changed.
+  const open = (id) => {
+    if (id === (onStage ? sim.id : null)) return;
+    setRoute(id);
+    show(id);
+  };
+
+  onRoute(ids, show);
+
+  buildTabs(el("tabs"), sim.catalog, sim.id, open);
 
   // One still shot and one renderer per card, both taken once. Cards only
   // redraw when the layout changes.
@@ -113,20 +160,20 @@ async function main() {
   }
 
   // The brand is the way back: no separate overview button, the landing page is
-  // the only other view. Leaving a scenario pauses it, same rule as switching
-  // between two.
-  el("btn-home").addEventListener("click", () => {
-    if (!onStage) return;
-    transport(false);
-    show(false);
-  });
+  // the only other view.
+  el("btn-home").addEventListener("click", () => open(null));
 
   window.addEventListener("resize", () => {
     if (!onStage) drawPreviews();
   });
 
   rebuild();
-  show(false);
+
+  // Whatever the URL asks for. An unknown path is not an error page, it is the
+  // list, and it rewrites itself so the bad path does not sit in history.
+  const landing = readRoute(ids);
+  setRoute(landing, { replace: true });
+  show(landing);
 
   el("btn-start").addEventListener("click", () => transport(true));
   el("btn-stop").addEventListener("click", () => transport(false));
@@ -156,7 +203,7 @@ async function main() {
     const snap = sim.snap;
     const body = { mass: sim.getParam("mass"), range: massRange };
     scene.draw(snap.frame, body, overlayInset(el("scene"), overlays));
-    fbd.draw(snap.frame.forces, body);
+    if (!showingTime) fbd.draw(snap.frame.forces, body);
     buildLegend(el("legend"), snap.frame);
     readout.update(sim, mode.readout);
 

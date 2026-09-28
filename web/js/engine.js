@@ -14,6 +14,31 @@ import { ParamMemory } from "./memory.js";
 
 const MAX_FRAME = 0.1; // s of real time fed to the engine in one go
 
+// The time-scale control, in the same shape as an engine parameter spec so it
+// renders through the same slider row. Not a scenario parameter: it changes how
+// fast the clock is fed, not what is being simulated, which is why it lives here
+// rather than in the engine's schema.
+export const TIME_SCALE = {
+  key: "time_scale",
+  label: "Rate",
+  unit: "x",
+  min: 0.05,
+  max: 4,
+  default: 1,
+  step: 0.05,
+  // Spaced by ratio: half speed sits as far below real time as double speed
+  // sits above it, so the slow-motion end is not crushed into a corner.
+  scale: "log",
+  marks: [
+    { value: 0.1, label: "Tenth speed" },
+    { value: 0.25, label: "Quarter speed" },
+    { value: 0.5, label: "Half speed" },
+    { value: 1, label: "Real time" },
+    { value: 2, label: "Double speed" },
+    { value: 4, label: "Quadruple speed" },
+  ],
+};
+
 // Everything a landing-page card needs to draw one scenario: a still frame at
 // that scenario's defaults, plus the mass the block is drawn with. The engine
 // is thrown away, nothing is stepped, and the running Sim is left alone.
@@ -35,6 +60,7 @@ export class Sim {
     this.catalog = catalog;
     this.integrators = integratorList;
     this.running = false;
+    this.timeScale = TIME_SCALE.default;
     this.memory = new ParamMemory();
     this.snap = engine.snapshot();
   }
@@ -86,6 +112,14 @@ export class Sim {
     this.refresh();
   }
 
+  // Every parameter back to the value the scenario declares. The clock and the
+  // state are left alone: this is the control panel going back to its starting
+  // point, not the run restarting.
+  resetParams() {
+    for (const spec of this.schema()) this.engine.setParam(spec.key, spec.default);
+    this.refresh();
+  }
+
   // ---- solver ----
 
   get integratorId() {
@@ -121,9 +155,13 @@ export class Sim {
 
   // Step by real elapsed seconds and re-read state. Returns true when the
   // engine actually moved.
+  //
+  // `timeScale` is how many simulated seconds one real second buys, so the
+  // engine is handed scaled time. A long real frame is clamped first, so a
+  // stalled tab does not come back and run a huge span at once.
   tick(elapsed) {
     if (!this.running) return false;
-    this.engine.advance(Math.min(elapsed, MAX_FRAME));
+    this.engine.advance(Math.min(elapsed, MAX_FRAME) * this.timeScale);
     this.refresh();
     return true;
   }

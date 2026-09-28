@@ -12,8 +12,8 @@ type Factory = fn() -> Box<dyn Scenario>;
 
 /// Every scenario the engine ships, in the order a UI should list them.
 static SCENARIOS: &[(&str, Factory)] = &[
-    ("spring", || Box::new(SpringScenario::new())),
     ("incline", || Box::new(InclineScenario::new())),
+    ("spring", || Box::new(SpringScenario::new())),
 ];
 
 /// Ids of every available scenario.
