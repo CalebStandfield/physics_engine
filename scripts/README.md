@@ -8,6 +8,7 @@ Build and serve. `run.sh` at the project root is the single entry point and call
 | `build.sh` | `wasm-pack build crates/physics-wasm --target web` into `web/pkg`, out-name `physics_wasm`. Extra args pass through (e.g. `--dev`). Needs `wasm-pack`. |
 | `devserver.py` | The static file server itself. `http.server` plus `Cache-Control: no-store`, `application/wasm`, and an `index.html` fallback for the scenario routes. `devserver.py PORT DIRECTORY`. |
 | `serve.sh` | Runs `devserver.py` on `$PORT` over `web`, in the foreground or in the background. Fails if `web/pkg` is empty. Takes `start`, `stop` or `status`; no argument means foreground. |
+| `vercel-build.sh` | Vercel's build command (set in `/vercel.json`). Installs rustup, the wasm32 target and wasm-pack if missing, then runs `build.sh`. Slow on Vercel since wasm-pack compiles from source. |
 
 ES modules need a real origin, so `file://` will not work. Serve it.
 
@@ -55,3 +56,10 @@ Everything is keyed by the port, so two ports are two independent servers and `P
 
 `--help` prints the header comment out of the script itself, so the usage block at the top
 of `run.sh` is the help text. Keep them the same thing.
+
+## Vercel
+
+`/vercel.json` does the config: build with `scripts/vercel-build.sh`, serve `web`, and rewrite
+extensionless paths to `index.html` (same fallback as `devserver.py`). In the Vercel project,
+Root Directory is the repo root (`./`), not `web`, since the build needs `crates/`. `web/pkg`
+stays untracked, Vercel builds it fresh every deploy.
