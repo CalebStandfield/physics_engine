@@ -67,54 +67,78 @@
         <button class="btn" id="btn-reset">
           <i data-icon="arrow-counter-clockwise"></i>Reset
         </button>
+        <span class="transport-gap"></span>
+        <button class="btn icon" id="btn-zoom-out" title="Zoom out" aria-label="Zoom out">
+          <i data-icon="minus"></i>
+        </button>
+        <button class="btn icon" id="btn-fit" title="Fit the view (pinch or scroll to zoom, drag to move)"
+                aria-label="Fit the view">
+          <i data-icon="corners-out"></i>
+        </button>
+        <button class="btn icon" id="btn-zoom-in" title="Zoom in" aria-label="Zoom in">
+          <i data-icon="plus"></i>
+        </button>
       </div>
 
-      <section class="panel panel-controls" id="panel-controls">
-        <div class="panel-head">
-          <div class="mode" id="mode-controls"></div>
-          <button class="panel-act" id="btn-reset-controls"
-                  title="Put every control back to its default">
-            <i data-icon="arrow-counter-clockwise"></i>
+      <!-- The panels. Floating over the scene on a wide screen, stacked under it
+           and folding on a narrow one. -->
+      <div class="dock">
+        <section class="panel panel-controls" id="panel-controls">
+          <button class="fold" type="button" aria-expanded="true">
+            <span>Controls</span><i data-icon="caret-right"></i>
           </button>
-        </div>
-        <h2>Controls</h2>
-        <div id="controls"></div>
-        <div id="solver-block">
-          <div class="divider"></div>
-          <h2>Solver</h2>
-          <div id="solver"></div>
-        </div>
-      </section>
-
-      <div class="col-right">
-        <section class="panel panel-legend">
-          <h2>Legend</h2>
-          <div id="legend"></div>
-        </section>
-
-        <section class="panel panel-fbd" id="panel-fbd">
           <div class="panel-head">
-            <div class="mode" id="mode-fbd"></div>
-            <button class="panel-act" id="btn-clock"
-                    title="Swap the diagram for the speed control">
-              <i data-icon="clock"></i>
+            <div class="mode" id="mode-controls"></div>
+            <button class="panel-act" id="btn-reset-controls"
+                    title="Put every control back to its default">
+              <i data-icon="arrow-counter-clockwise"></i>
             </button>
           </div>
-
-          <div id="view-fbd">
-            <h2>Free body diagram</h2>
-            <canvas id="fbd"></canvas>
+          <h2>Controls</h2>
+          <div id="controls"></div>
+          <div id="solver-block">
+            <div class="divider"></div>
+            <h2>Solver</h2>
+            <div id="solver"></div>
           </div>
-
-          <div id="view-time" class="hidden">
-            <h2>Speed</h2>
-            <div id="timescale"></div>
-          </div>
-
-          <div class="divider"></div>
-          <h2>Readout</h2>
-          <div class="rows" id="readout"></div>
         </section>
+
+        <div class="col-right">
+          <section class="panel panel-legend folded">
+            <button class="fold" type="button" aria-expanded="true">
+              <span>Legend</span><i data-icon="caret-right"></i>
+            </button>
+            <h2>Legend</h2>
+            <div id="legend"></div>
+          </section>
+
+          <section class="panel panel-fbd" id="panel-fbd">
+            <button class="fold" type="button" aria-expanded="true">
+              <span>Diagram + readout</span><i data-icon="caret-right"></i>
+            </button>
+            <div class="panel-head">
+              <div class="mode" id="mode-fbd"></div>
+              <button class="panel-act" id="btn-clock"
+                      title="Swap the diagram for the speed control">
+                <i data-icon="clock"></i>
+              </button>
+            </div>
+
+            <div id="view-fbd">
+              <h2>Free body diagram</h2>
+              <canvas id="fbd"></canvas>
+            </div>
+
+            <div id="view-time" class="hidden">
+              <h2>Speed</h2>
+              <div id="timescale"></div>
+            </div>
+
+            <div class="divider"></div>
+            <h2>Readout</h2>
+            <div class="rows" id="readout"></div>
+          </section>
+        </div>
       </div>
 
       <p class="caption" id="caption"></p>

@@ -6,6 +6,7 @@
 use physics_core::scenario::Scenario;
 
 use crate::incline::InclineScenario;
+use crate::pendulum::PendulumScenario;
 use crate::spring::SpringScenario;
 
 type Factory = fn() -> Box<dyn Scenario>;
@@ -14,6 +15,7 @@ type Factory = fn() -> Box<dyn Scenario>;
 static SCENARIOS: &[(&str, Factory)] = &[
     ("incline", || Box::new(InclineScenario::new())),
     ("spring", || Box::new(SpringScenario::new())),
+    ("pendulum", || Box::new(PendulumScenario::new())),
 ];
 
 /// Ids of every available scenario.
@@ -60,8 +62,8 @@ mod tests {
             for spec in s.schema() {
                 let shared = crate::controls::control(spec.key);
                 assert_eq!(
-                    (spec.min, spec.max, spec.step, spec.unit, spec.tier),
-                    (shared.min, shared.max, shared.step, shared.unit, shared.tier),
+                    (spec.min, spec.max, spec.step, spec.unit, spec.tier, spec.widget),
+                    (shared.min, shared.max, shared.step, shared.unit, shared.tier, shared.widget),
                     "{id}.{} drifted from the catalog",
                     spec.key
                 );

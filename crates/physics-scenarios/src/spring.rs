@@ -16,7 +16,7 @@
 use physics_core::bind;
 use physics_core::math::Vec2;
 use physics_core::params::{self, ParamDef, ParamError, ParamSpec};
-use physics_core::scenario::{BodyPose, Derived, ForceVector, Frame, Guide, Scenario};
+use physics_core::scenario::{BodyPose, BodyShape, Derived, ForceVector, Frame, Guide, Scenario};
 use physics_core::state::State;
 
 use crate::controls::control;
@@ -277,7 +277,7 @@ impl Scenario for SpringScenario {
         params::set(&self.defs, &mut self.params, key, value)
     }
 
-    fn mass(&self) -> f64 {
+    fn inertia(&self) -> f64 {
         self.params.mass
     }
 
@@ -362,9 +362,12 @@ impl Scenario for SpringScenario {
         Frame {
             body: self.body_position(state.x),
             axis: AXIS,
+            shape: BodyShape::Block,
+            pivot: None,
             // Hanging free: nothing to sit on, nothing to tilt against.
             pose: BodyPose::default(),
             forces,
+            couples: Vec::new(),
             guides,
         }
     }

@@ -2,8 +2,23 @@
 //
 // Each overlay is assigned to the side it sits on, so the scene can be fitted
 // into what is actually visible. Nothing here knows which panel is which.
+//
+// Only overlays that float count. On a narrow screen the panels are laid out
+// under the scene in normal flow, so they never cover it, even while they
+// scroll.
 
 const GAP = 16; // px of breathing room between a panel and the scene
+
+const FLOATING = new Set(["absolute", "fixed", "sticky"]);
+
+// True when the element, or anything between it and the canvas's container,
+// is taken out of normal flow.
+function floats(el, container) {
+  for (let node = el; node && node !== container; node = node.parentElement) {
+    if (FLOATING.has(getComputedStyle(node).position)) return true;
+  }
+  return false;
+}
 
 export function overlayInset(canvas, overlays) {
   const c = canvas.getBoundingClientRect();
@@ -12,6 +27,7 @@ export function overlayInset(canvas, overlays) {
   const inset = { left: 0, right: 0, top: 0, bottom: 0 };
 
   for (const el of overlays) {
+    if (!floats(el, canvas.parentElement)) continue;
     const r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) continue;
 

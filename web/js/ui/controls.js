@@ -2,10 +2,13 @@
 // names a scenario or a parameter, so a new scenario gets a full control panel
 // for free.
 
-import { shows } from "./mode.js";
+import { SIMPLE, shows } from "./mode.js";
 import { sliderRow } from "./slider.js";
+import { toggleRow } from "./toggle.js";
 
-// Parameters that only take effect when the run restarts.
+// Starting values. Before Start (or right after Reset) they apply at once;
+// once the run has moved they wait for the next Reset. The engine does that,
+// this only tags them.
 const RESET_ONLY = /^initial_/;
 
 const DT_CHOICES = [
@@ -21,22 +24,36 @@ export function buildControls(root, sim, mode, onChange) {
 
   for (const spec of sim.schema()) {
     if (!shows(mode, spec.tier)) continue;
-    root.append(paramRow(spec, sim, onChange));
+    root.append(paramRow(spec, sim, mode, onChange));
   }
 }
 
-function paramRow(spec, sim, onChange) {
-  const row = sliderRow(spec, {
-    get: () => sim.getParam(spec.key) ?? spec.default,
-    set: (v) => sim.setParam(spec.key, v),
-    onChange: () => onChange(spec.key),
-  });
+// A `switch` parameter is a slider that the simple panel shows as a checkbox:
+// checked while the value is above its minimum, checking it sets the engine's
+// `on` value, unchecking puts it back to the minimum. The advanced panel gets
+// the full slider. Which parameters do this is the engine's call.
+function paramRow(spec, sim, mode, onChange) {
+  const get = () => sim.getParam(spec.key) ?? spec.default;
+  const changed = () => onChange(spec.key);
+
+  const row =
+    spec.widget?.kind === "switch" && mode === SIMPLE
+      ? toggleRow(spec, {
+          checked: () => get() > spec.min,
+          setChecked: (on) => sim.setParam(spec.key, on ? spec.widget.on : spec.min),
+          onChange: changed,
+        })
+      : sliderRow(spec, {
+          get,
+          set: (v) => sim.setParam(spec.key, v),
+          onChange: changed,
+        });
 
   if (RESET_ONLY.test(spec.key)) {
     const tag = document.createElement("span");
     tag.className = "ctl-tag";
     tag.textContent = "on reset";
-    tag.title = "Applies the next time you press Reset";
+    tag.title = "Applies right away before Start; once running, the next time you press Reset";
     row.label.append(" ", tag);
   }
 

@@ -27,9 +27,10 @@ impl State {
         Self::new(0.0, x, 0.0)
     }
 
-    /// Kinetic energy of a body of mass `mass`, joules.
-    pub fn kinetic_energy(&self, mass: f64) -> f64 {
-        0.5 * mass * self.v * self.v
+    /// Kinetic energy, joules, given the inertia along `x`: `m v^2 / 2` for a
+    /// mass, `I omega^2 / 2` for a moment of inertia.
+    pub fn kinetic_energy(&self, inertia: f64) -> f64 {
+        0.5 * inertia * self.v * self.v
     }
 
     /// True once every field is finite. A blown-up integration shows up here.

@@ -15,6 +15,20 @@ pub enum Tier {
     Advanced,
 }
 
+/// How a UI should render a parameter. The value is an `f64` either way, so
+/// binding, storing and validating a parameter never cares which one it is.
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum Widget {
+    /// A range with a slider and a number box.
+    #[default]
+    Slider,
+    /// A slider that a simple panel shows as a checkbox instead: checked while
+    /// the value is above `min`, checking it sets `on`, unchecking sets `min`.
+    /// An advanced panel shows the full slider.
+    Switch { on: f64 },
+}
+
 /// A value on a control's range worth pointing at: a landmark, not a limit.
 ///
 /// Earth gravity on the gravity slider, 45 degrees on a ramp. The UI marks these
@@ -53,6 +67,9 @@ pub struct ParamSpec {
     pub step: f64,
     /// Whether a simple panel should show this one.
     pub tier: Tier,
+    /// Slider, or a slider that a simple panel shows as a checkbox.
+    #[serde(default)]
+    pub widget: Widget,
     /// Values on the range worth marking. Empty for a range with no landmarks.
     /// Write-only across serde: a spec read back in comes with no marks, since a
     /// borrowed slice cannot outlive the input it was read from.
@@ -72,6 +89,13 @@ impl ParamSpec {
     /// scenario, e.g. which way is positive.
     pub const fn with_label(mut self, label: &'static str) -> Self {
         self.label = label;
+        self
+    }
+
+    /// Same control, shown as a checkbox in a simple panel. `on` is the value
+    /// checking it sets.
+    pub const fn with_switch(mut self, on: f64) -> Self {
+        self.widget = Widget::Switch { on };
         self
     }
 
@@ -211,6 +235,7 @@ mod tests {
             default,
             step: 0.1,
             tier: Tier::Basic,
+            widget: Widget::Slider,
             marks: &[],
         }
     }

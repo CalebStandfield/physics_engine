@@ -17,7 +17,8 @@ anywhere the user or a grader will read it.
 
 ## Scenarios
 
-Two real-world scenarios, both from the current unit (springs, force vectors):
+Three real-world scenarios. 1 and 2 are Project 1 (springs, force vectors); 3 is Project 2
+(torque, rotational dynamics, energy):
 
 1. **Block hanging from a spring** — vertical mass-spring system. Forces: spring force
    (Hooke's law, F = -kx) and gravity. Produces oscillation; good for showing force vectors
@@ -25,6 +26,10 @@ Two real-world scenarios, both from the current unit (springs, force vectors):
 2. **Block on an incline** — block on a hill at some angle. Forces: gravity decomposed into
    components along and normal to the incline, normal force, friction (static/kinetic).
    Good for showing vector decomposition.
+3. **Meter stick on a pivot** — a uniform rod hung on a nail through a hole (physical
+   pendulum). Coordinate is the angle, inertia is the moment of inertia about the pivot, the
+   driving quantity is gravity's torque. The Project 2 question is how the period depends on
+   where the hole is (shortest at d = L / sqrt(12)).
 
 "Real-world" means real parameters: an actual mass in kg, a spring constant in N/m, an
 incline angle in degrees, a friction coefficient — not arbitrary unitless numbers. Any
@@ -40,7 +45,7 @@ Modular pipeline — each stage should be swappable without touching the others:
 - **Core simulation crate**: state (position, velocity, forces), the integrator, and vector
   math. Scenario-agnostic — knows nothing about springs or inclines specifically, just how to
   step a body forward given a force.
-- **Scenario modules**: one for the spring, one for the incline. Each implements a shared
+- **Scenario modules**: one each for the spring, the incline and the pendulum. Each implements a shared
   trait/interface (e.g. "compute forces given current state and scenario parameters") that
   plugs into the core integrator. Adding a third scenario later should mean writing one new
   module, not touching the core.

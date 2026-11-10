@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::analysis::PeriodDetector;
 use crate::integrator::{default_integrator, Integrator};
+use crate::params::ParamError;
 use crate::record::Recorder;
 use crate::scenario::{Derived, Frame, Scenario, ScenarioSystem};
 use crate::state::State;
@@ -151,6 +152,19 @@ impl Simulation {
         self.reset();
     }
 
+    /// Change one scenario parameter. Before the first step (fresh, or just
+    /// reset) the run is still sitting at its starting state, which is part of
+    /// the setup, so it is rebuilt from the new value and the picture matches
+    /// the controls. Once the run has moved, a starting value waits for
+    /// `reset`, like it always did.
+    pub fn set_param(&mut self, key: &str, value: f64) -> Result<(), ParamError> {
+        self.scenario.set_param(key, value)?;
+        if self.steps == 0 {
+            self.reset();
+        }
+        Ok(())
+    }
+
     /// Back to the scenario's initial state, clock and recording cleared.
     /// Parameters are kept.
     pub fn reset(&mut self) {
@@ -195,7 +209,7 @@ impl Simulation {
         let dt = self.dt;
         let pieces = self.subdivisions();
         let h = dt / pieces as f64;
-        let mass = self.scenario.mass();
+        let inertia = self.scenario.inertia();
         let before = self.state;
 
         let mut next = self.state;
@@ -211,9 +225,9 @@ impl Simulation {
         // Constraints only ever take energy out (a block hitting the end of a
         // ramp, static friction parking one that just stopped), so whatever
         // kinetic energy they remove belongs in the same ledger.
-        let kinetic_before = next.kinetic_energy(mass);
+        let kinetic_before = next.kinetic_energy(inertia);
         self.scenario.constrain(&before, &mut next);
-        self.energy_lost += (kinetic_before - next.kinetic_energy(mass)).max(0.0);
+        self.energy_lost += (kinetic_before - next.kinetic_energy(inertia)).max(0.0);
 
         self.state = next;
         self.steps += 1;

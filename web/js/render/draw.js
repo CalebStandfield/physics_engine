@@ -68,6 +68,38 @@ export function arrow(ctx, from, to, { color, width = 2, dash = [], head = 8 }) 
   ctx.restore();
 }
 
+// A curved arrow around `center`, for a torque. `ccw` is the world sense
+// (counterclockwise positive); canvas y points down, but a counterclockwise arc
+// still looks counterclockwise, so it maps straight across.
+const TURN_SWEEP = Math.PI * 1.3;
+
+export function turnArrow(ctx, center, radius, ccw, { color, width = 2, head = 7 }) {
+  const start = -Math.PI / 2 - (ccw ? -1 : 1) * 0.35;
+  const end = start + (ccw ? -TURN_SWEEP : TURN_SWEEP);
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, radius, start, end, ccw);
+  ctx.stroke();
+
+  // Head at the end, along the direction of travel.
+  const tip = { x: center.x + radius * Math.cos(end), y: center.y + radius * Math.sin(end) };
+  const s = ccw ? -1 : 1;
+  const tx = -Math.sin(end) * s;
+  const ty = Math.cos(end) * s;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(tip.x + tx * head * 0.6, tip.y + ty * head * 0.6);
+  ctx.lineTo(tip.x - tx * head * 0.6 - ty * head * 0.45, tip.y - ty * head * 0.6 + tx * head * 0.45);
+  ctx.lineTo(tip.x - tx * head * 0.6 + ty * head * 0.45, tip.y - ty * head * 0.6 - tx * head * 0.45);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 // `angle` is a canvas rotation about the center, radians, positive clockwise
 // (canvas y points down, so a world angle comes in negated).
 export function roundedRect(ctx, cx, cy, w, h, r, { fill, stroke, width = 2, angle = 0 }) {

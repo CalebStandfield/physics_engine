@@ -24,7 +24,7 @@
 use physics_core::bind;
 use physics_core::math::Vec2;
 use physics_core::params::{self, ParamDef, ParamError, ParamSpec};
-use physics_core::scenario::{BodyPose, Derived, ForceVector, Frame, Guide, Scenario};
+use physics_core::scenario::{BodyPose, BodyShape, Derived, ForceVector, Frame, Guide, Scenario};
 use physics_core::state::State;
 
 use crate::controls::control;
@@ -361,7 +361,7 @@ impl Scenario for InclineScenario {
         params::set(&self.defs, &mut self.params, key, value)
     }
 
-    fn mass(&self) -> f64 {
+    fn inertia(&self) -> f64 {
         self.params.mass
     }
 
@@ -441,6 +441,8 @@ impl Scenario for InclineScenario {
         Frame {
             body,
             axis,
+            shape: BodyShape::Block,
+            pivot: None,
             // The box lies along the slope and sits on top of it. `body` stays on
             // the surface line, where the physics puts it.
             pose: BodyPose {
@@ -448,6 +450,7 @@ impl Scenario for InclineScenario {
                 support: normal,
             },
             forces,
+            couples: Vec::new(),
             guides,
         }
     }

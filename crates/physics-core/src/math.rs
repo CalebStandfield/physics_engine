@@ -4,6 +4,21 @@
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
+/// Arithmetic-geometric mean of two positive numbers: replace the pair with its
+/// average and its geometric mean until they agree. Converges in a handful of
+/// rounds. The exact period of a pendulum at any amplitude is the small-angle
+/// period divided by `agm(1, cos(amplitude / 2))`.
+pub fn agm(a: f64, b: f64) -> f64 {
+    let (mut a, mut b) = (a, b);
+    for _ in 0..64 {
+        if (a - b).abs() <= 1e-15 * a.abs() {
+            break;
+        }
+        (a, b) = (0.5 * (a + b), (a * b).sqrt());
+    }
+    0.5 * (a + b)
+}
+
 /// Point or vector in world space. Meters for positions, newtons for forces.
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub struct Vec2 {

@@ -16,6 +16,11 @@ pub struct ForceVector {
     pub kind: String,
     /// The force itself, world-space newtons.
     pub vector: Vec2,
+    /// World point the force acts at. `None` means the body's center
+    /// (`Frame::body`), which is all a point mass ever needs. An extended body
+    /// sets it, since where a force acts decides the torque it makes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<Vec2>,
 }
 
 impl ForceVector {
@@ -24,12 +29,50 @@ impl ForceVector {
             label: label.to_string(),
             kind: kind.to_string(),
             vector,
+            at: None,
         }
+    }
+
+    /// Act at a world point instead of the body's center.
+    pub fn acting_at(mut self, point: Vec2) -> Self {
+        self.at = Some(point);
+        self
+    }
+
+    /// Where the force acts, given where the body is.
+    pub fn origin(&self, body: Vec2) -> Vec2 {
+        self.at.unwrap_or(body)
     }
 
     /// Magnitude in newtons.
     pub fn magnitude(&self) -> f64 {
         self.vector.len()
+    }
+}
+
+/// A pure torque on the body, with no single line of action: friction where a
+/// stick rubs on its nail, say. Only means something for a body with a pivot.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Couple {
+    /// Free-body-diagram label, e.g. `"Pivot friction"`.
+    pub label: String,
+    /// Short tag for styling, same set as `ForceVector::kind`.
+    pub kind: String,
+    /// The torque, N m, counterclockwise positive.
+    pub torque: f64,
+    /// Where to draw it. A couple acts on the whole body; this is just where
+    /// the curved arrow goes.
+    pub at: Vec2,
+}
+
+impl Couple {
+    pub fn new(label: &str, kind: &str, torque: f64, at: Vec2) -> Self {
+        Self {
+            label: label.to_string(),
+            kind: kind.to_string(),
+            torque,
+            at,
+        }
     }
 }
 
@@ -71,29 +114,69 @@ pub struct BodyPose {
     pub support: Vec2,
 }
 
+/// What the body looks like, for drawing only. No physics reads this.
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum BodyShape {
+    /// A point mass, drawn as a fixed-size block.
+    #[default]
+    Block,
+    /// A thin rigid rod centered on `Frame::body`, lying along `BodyPose::angle`.
+    /// Drawn to scale, meters.
+    Rod { length: f64, width: f64 },
+}
+
 /// Everything needed to draw the system at one instant, in world meters.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Frame {
-    /// Center of the body.
+    /// Center of the body (center of mass, for an extended one).
     pub body: Vec2,
-    /// Unit vector pointing along increasing `State::x`.
+    /// Unit vector the body's center moves along as `State::x` increases.
     pub axis: Vec2,
     /// How the body is turned and seated. Drawing only.
     pub pose: BodyPose,
+    /// What the body looks like. Drawing only.
+    pub shape: BodyShape,
+    /// The fixed point a rotating body turns about. `None` for a body that
+    /// translates, where `State::x` is a distance and not an angle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pivot: Option<Vec2>,
     /// Every force on the body, for the free-body diagram.
     pub forces: Vec<ForceVector>,
+    /// Pure torques on the body. Empty for anything without a pivot.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub couples: Vec<Couple>,
     /// Static scenery.
     pub guides: Vec<Guide>,
 }
 
 impl Frame {
-    /// Vector sum of the drawn forces. Should agree with the scalar
-    /// `Scenario::net_force` projected on `axis`; `frame_matches_net_force`
-    /// checks that for each scenario.
+    /// Vector sum of the drawn forces, N. For a point mass this is the net force;
+    /// for an extended body it is mass times the acceleration of the center of
+    /// mass.
     pub fn net_force(&self) -> Vec2 {
         self.forces
             .iter()
             .fold(Vec2::ZERO, |sum, f| sum + f.vector)
+    }
+
+    /// The drawn forces reduced to the one number the coordinate feels: the sum
+    /// of torques about the pivot when there is one (N m, counterclockwise
+    /// positive, couples included), otherwise the net force along `axis` (N).
+    /// Should agree with `Scenario::net_force`; a contract test checks that for
+    /// every scenario.
+    pub fn generalized_force(&self) -> f64 {
+        match self.pivot {
+            Some(pivot) => {
+                let from_forces: f64 = self
+                    .forces
+                    .iter()
+                    .map(|f| (f.origin(self.body) - pivot).cross(f.vector))
+                    .sum();
+                from_forces + self.couples.iter().map(|c| c.torque).sum::<f64>()
+            }
+            None => self.net_force().component_along(self.axis),
+        }
     }
 }
 
@@ -195,14 +278,19 @@ pub trait Scenario {
 
     fn set_param(&mut self, key: &str, value: f64) -> Result<(), ParamError>;
 
-    /// Mass of the body, kg. Constant over a run.
-    fn mass(&self) -> f64;
+    /// Inertia along the coordinate. Constant over a run. Mass in kg when
+    /// `State::x` is a distance, moment of inertia about the pivot in kg m^2
+    /// when it is an angle. Either way `net_force / inertia` is the
+    /// acceleration of the coordinate and `inertia v^2 / 2` is the kinetic
+    /// energy, which is all the core ever does with it.
+    fn inertia(&self) -> f64;
 
     /// State the simulation starts and resets to.
     fn initial_state(&self) -> State;
 
-    /// Net force along the axis at a trial point, newtons. Signed: positive
-    /// means along `Frame::axis`.
+    /// Net generalized force at a trial point: the force along `Frame::axis`
+    /// in N for a distance coordinate, the torque about the pivot in N m for an
+    /// angle (counterclockwise positive). Signed: positive pushes `State::x` up.
     ///
     /// Takes loose components rather than a `State` because integrators
     /// evaluate it away from the current state.
@@ -250,11 +338,11 @@ pub trait Scenario {
 }
 
 /// Adapts a scenario into the bare acceleration function the integrators want.
-/// This is the only place `F = ma` is divided out.
+/// This is the only place `F = ma` (or `tau = I alpha`) is divided out.
 pub struct ScenarioSystem<'a>(pub &'a dyn Scenario);
 
 impl crate::system::System for ScenarioSystem<'_> {
     fn accel(&self, x: f64, v: f64, t: f64) -> f64 {
-        self.0.net_force(x, v, t) / self.0.mass()
+        self.0.net_force(x, v, t) / self.0.inertia()
     }
 }

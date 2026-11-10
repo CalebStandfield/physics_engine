@@ -1,6 +1,6 @@
 # physics-scenarios
 
-The two concrete scenarios. Each implements `physics_core::Scenario`: force law,
+The concrete scenarios. Each implements `physics_core::Scenario`: force law,
 geometry, derived quantities. No time-stepping lives here.
 
 ## Files
@@ -9,9 +9,10 @@ geometry, derived quantities. No time-stepping lives here.
 | --- | --- |
 | `src/spring.rs` | `SpringScenario`, `SpringParams`. Block hanging from a vertical spring. |
 | `src/incline.rs` | `InclineScenario`, `InclineParams`. Block on a ramp with friction. |
+| `src/pendulum.rs` | `PendulumScenario`, `PendulumParams`. Meter stick swinging on a pivot (physical pendulum). |
 | `src/controls.rs` | The control catalog: every slider any scenario can offer, with its range, step, unit, tier and marks. `control(key)`, `all()`. |
 | `src/registry.rs` | id -> scenario factory. `ids()`, `create(id)`, `default_scenario()`. |
-| `examples/report.rs` | Prints engine numbers next to the hand calculation for both scenarios. Anything quoted in the write-up comes from here. `cargo run -p physics-scenarios --example report`. |
+| `examples/report.rs` | Prints engine numbers next to the hand calculation for every scenario. Anything quoted in the write-up comes from here. `cargo run -p physics-scenarios --example report`. |
 | `tests/engine.rs` | End-to-end checks. The contract tests at the bottom loop over the registry, so a new scenario inherits them. |
 
 ## Spring
@@ -45,6 +46,33 @@ axis `(cos t, -sin t)`, outward normal `(sin t, cos t)`.
 - `pose` turns the drawn block by `-theta` and points `support` out of the surface, so the block
   lies along the ramp and sits on it. `frame.body` stays on the slope line.
 
+## Pendulum
+
+Coordinate `x` is the angle from straight down, radians, ccw +; `v` is angular velocity. Pivot
+at the origin, center of mass at `d (sin t, -cos t)`. `inertia()` is the moment of inertia about
+the pivot and `net_force` is the torque.
+
+- `d = min(pivot_offset, L / 2)` (`pivot_distance`): a hole past the end is the end.
+- `I_cm = M L^2 / 12`, `I = I_cm + M d^2`, `tau = -M g d sin(theta)`.
+- `ideal_period` `T_0 = 2 pi sqrt(I / (M g d))`. `shortest_period_pivot` `L / sqrt(12)`,
+  `shortest_period` `2 pi sqrt(2 d_min / g)`.
+- `amplitude` from energy at release, `None` once it goes over the top. `amplitude_period`
+  `T_0 / AGM(1, cos(theta_max / 2))`, exact at any amplitude.
+- Pivot force, split along the stick (toward the pivot) `M d omega^2 + M g cos(theta)` and across
+  it (along the tangent) `M d alpha + M g sin(theta)`. Drawn acting at the pivot, so its torque is
+  zero, and weight + pivot force = `M a_cm`.
+- Energy loss: `energy_loss` `p`, percent of the swing energy lost per second (0 off, the
+  default). Friction at the nail, `tau_f = -b omega` with `b = -I ln(1 - p / 100)`, which gives
+  that rate for light friction. A switch: a checkbox in simple mode that sets 5 %/s, a 0-90
+  slider in advanced. It is a `Couple` at the pivot, `dissipated_power` is `b omega^2`, and the angular accel and
+  the pivot force across the stick both use `(tau + tau_f) / I`. The amplitude rows are the
+  release swing, labeled so.
+- Controls: `mass` (default 0.15), `rod_length`, `pivot_offset`, `initial_angle_deg`,
+  `initial_angular_velocity` (relabeled "ccw +"), `energy_loss`, `gravity`.
+- `max_stable_dt` = half of `min(2 / omega_0, 2 I / b)`, same rule as the spring.
+- Frame: `BodyShape::Rod`, `pivot` at the origin, `pose.angle = theta - 90 deg`. Guides:
+  `Vertical` (reference), `Pivot` (pivot).
+
 ## Controls
 
 A scenario does not invent a slider. It picks keys out of `controls.rs` and binds them to its
@@ -53,13 +81,18 @@ both: `mass` is 0.01-100 kg everywhere, whoever is asking. Only the default and 
 per-scenario, through `with_default` and `with_label`. A registry test checks every schema entry
 still matches the catalog, so the ranges cannot drift apart again.
 
+A control can be a switch, `.with_switch(on)`: a checkbox in simple mode (checked while above
+`min`, checking sets `on`) and its full slider in advanced. `energy_loss` is one, and a test keeps
+every `on` inside its range.
+
 A control can also carry marks, through `with_marks`: the values on its range worth pointing at,
 which the UI puts on the track as clickable ticks. Gravity marks the Moon, Mars and Earth, the
 incline angle marks 15/30/45/60 degrees, and the ranges that straddle zero mark it (at rest,
 equilibrium, no applied force). A test keeps every mark inside its own range.
 
 Each control also carries a `Tier`. Basic is the short list a simple panel shows (`mass`,
-`stiffness`, `initial_displacement`, `angle_deg`, `mu_static`, `mu_kinetic`); everything else,
+`stiffness`, `initial_displacement`, `angle_deg`, `mu_static`, `mu_kinetic`, `rod_length`,
+`pivot_offset`, `initial_angle_deg`, `energy_loss`); everything else,
 gravity and the initial-condition knobs included, is advanced. `Derived` rows carry the same
 tier, so one switch in the UI trims both panels.
 

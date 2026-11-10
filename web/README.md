@@ -10,13 +10,13 @@ plain reload. `pkg/` is wasm-pack output, generated, do not edit.
 
 | File | What is in it |
 | --- | --- |
-| `index.html` | Two views: the landing page (`home`) and the stage (`stage`). Icons are named with `data-icon` and swapped for Phosphor glyphs (fill weight) at boot by `js/ui/icons.js`. Element ids the JS looks up: `home`, `cards`, `stage`, `tabs`, `btn-home`, `scene`, `fbd`, `controls`, `solver`, `solver-block`, `legend`, `readout`, `caption`, `boot`, `btn-start`, `btn-stop`, `btn-reset`, `mode-controls`, `mode-fbd`, `panel-controls`, `panel-fbd`, `btn-reset-controls`, `btn-clock`, `view-fbd`, `view-time`, `timescale`. |
-| `styles.css` | Dark theme, tokens in `:root`. Panels float over the canvas. Narrow-screen rules at the bottom under `@media (max-width: 1180px)`. |
+| `index.html` | Two views: the landing page (`home`) and the stage (`stage`). Icons are named with `data-icon` and swapped for Phosphor glyphs (fill weight) at boot by `js/ui/icons.js`. The panels sit in `.dock` (`display: contents` on a wide screen) and each starts with a `.fold` button. Element ids the JS looks up: `btn-zoom-in`, `btn-zoom-out`, `btn-fit`, `home`, `cards`, `stage`, `tabs`, `btn-home`, `scene`, `fbd`, `controls`, `solver`, `solver-block`, `legend`, `readout`, `caption`, `boot`, `btn-start`, `btn-stop`, `btn-reset`, `mode-controls`, `mode-fbd`, `panel-controls`, `panel-fbd`, `btn-reset-controls`, `btn-clock`, `view-fbd`, `view-time`, `timescale`. |
+| `styles.css` | Dark theme, tokens in `:root`. Panels float over the canvas. Narrow desktops under `@media (max-width: 1180px)`, phones under `@media (max-width: 760px)`, both at the bottom. |
 | `js/engine.js` | `Sim`, the wrapper over the wasm `Engine`. Module init, run/pause, and one snapshot cached per frame so every panel shares one boundary crossing. `MAX_FRAME = 0.1 s` clamps a long stall. `spec(key)` hands a panel one parameter's range. `stillShot(id)` is a one-off frame of any scenario at its defaults, for the landing page cards. `timeScale` scales the time handed to the engine each frame, declared by the `TIME_SCALE` spec here; `resetParams()` puts every parameter back to its declared default without touching the clock. |
 | `js/router.js` | `readRoute`, `routeOf`, `setRoute`, `onRoute`. The URL as the view: `/` is the list, `/<scenario id>` is that scenario. Ids come from the catalog, so the routes are not written down anywhere. |
 | `js/memory.js` | `ParamMemory`. Slider values kept per scenario for as long as the page is open. |
 | `js/app.js` | Wiring, the two-view switch, and the `requestAnimationFrame` loop. Paused frames still redraw, so slider changes show up right away. Owns the simple/advanced mode. |
-| `js/camera.js` | `Camera`. World meters -> canvas pixels, and the only place world +y up flips to canvas +y down. |
+| `js/camera.js` | `Camera`. World meters -> canvas pixels, and the only place world +y up flips to canvas +y down. Fitted view plus a user zoom/pan on top. |
 | `js/theme.js` | `COLOR` tokens plus `forceStyle(kind)`, `guideStyle(kind)`, `NET_STYLE`. Every canvas color comes from here. |
 | `js/render/` | Canvas drawing. See `js/render/README.md`. |
 | `js/ui/` | DOM panels and the icon set. See `js/ui/README.md`. |
@@ -29,7 +29,7 @@ stage; the brand on the left of the rail goes back and pauses whatever was runni
 as switching scenarios. The scenario tabs only show on the stage, since the landing page is
 already the list.
 
-Which view is up is in the URL: `/` is the list and `/<scenario id>` (`/incline`, `/spring`) is
+Which view is up is in the URL: `/` is the list and `/<scenario id>` (`/incline`, `/spring`, `/pendulum`) is
 one scenario, so a scenario can be linked to and back/forward work. The ids come from the
 catalog, so a scenario added in Rust gets its route with no change here, and a path naming no
 scenario lands on the list and rewrites itself. Every click goes through `open(id)`, which sets
@@ -39,19 +39,33 @@ the back button). One page behind several URLs means the server has to answer th
 has no extension, and any other host serving this needs the same fallback.
 
 Cards are built from `scenario_catalog()` in `js/ui/home.js`, so a scenario added in Rust gets
-a card with no change here. The grid is `auto-fit`, so two scenarios sit side by side and four
-fall into a 2x2. Previews are drawn once and again on resize; the render loop does nothing
+a card with no change here. The grid is `auto-fit` at `minmax(270px, 1fr)` in an 1100 px column,
+so three sit in one row on a large screen and fewer as it narrows. Previews are drawn once and again on resize; the render loop does nothing
 while the landing page is up.
+
+## Phones
+
+Under 760 px the stage is a column: the scene on top (`--scene-h`), the transport as its own row
+under it, then `.dock` as the only thing that scrolls, holding the panels stacked full width. Each
+panel folds behind its `.fold` chevron (`js/ui/fold.js`); the legend starts folded. The tabs drop
+to a second rail row and scroll sideways, and the caption is hidden since the landing card says
+the same thing. `.stage:not(.hidden)` matters: a plain `.stage { display: flex }` there would
+beat `.hidden` and cover the landing page. On a wide screen the fold buttons are hidden and
+`.folded` does nothing.
 
 ## Camera
 
-- `observe(frame, guides)` grows an accumulated fit box over the body and every guide point.
+- `observe(frame, guides)` grows an accumulated fit box over the body (both ends, for a rod) and every guide point.
   `guides` defaults to all of them; a renderer that hides some (the card previews) passes the
   ones it actually draws, so the view leaves no room for lines nobody sees. The box
   only grows between `reset()` calls, otherwise an oscillating body makes the view breathe.
 - `fit(width, height, inset)` lerps toward the target view (`LERP = 0.12`, `PAD = 0.14`).
   `inset` is the region the floating panels cover, so the scene centers in what is visible.
-- `toPx(p)` is the conversion. `scale` is pixels per meter.
+- `toPx(p)` is the conversion. `scale` is pixels per meter, user zoom included.
+- The user view sits on top of the fit: `zoom` (0.2 to 20) and `panX`/`panY` in px, changed by
+  `zoomBy(factor, at)` (keeps the point under `at` still) and `panBy`. `reset()` only clears the
+  fit, so a sim reset or a panel rebuild keeps where the user was looking; `resetView()` clears
+  the zoom and pan, on a scenario switch or the fit button. Input is `js/ui/viewport.js`.
 
 ## Simple and advanced
 

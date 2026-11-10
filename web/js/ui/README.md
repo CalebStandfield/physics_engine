@@ -8,6 +8,7 @@ DOM panels. All of them are rebuilt from engine data, so a new scenario needs no
 | `icons.js` | `ICONS`, `icon(name)`, `hydrateIcons(root)`. Phosphor Icons (fill weight) vendored as path data. |
 | `topbar.js` | `buildTabs`, `setActiveTab`, `setCaption`. Scenario tabs from `scenario_catalog()`. |
 | `controls.js` | `buildControls` (one row per `ParamSpec` the mode shows), `buildSolver` (integrator picker and step-size picker). |
+| `toggle.js` | `toggleRow(spec, {checked, setChecked, onChange})`. A checkbox; the caller decides what on and off mean as numbers. |
 | `slider.js` | `sliderRow(spec, {get, set, onChange})`. One numeric control: slider, editable value box, and the landmarks on its track. Spec-driven, so anything with a range can use it. |
 | `timescale.js` | `buildTimeScale`. The speed control, a `sliderRow` over `TIME_SCALE` from `engine.js`. |
 | `legend.js` | `buildLegend`. Rows for the forces in the current frame plus one per scenery kind. |
@@ -15,7 +16,9 @@ DOM panels. All of them are rebuilt from engine data, so a new scenario needs no
 | `mode.js` | `buildModeToggle`, `setActiveMode`, and `shows(mode, tier)`, the one place the simple/advanced rule lives. |
 | `accordion.js` | `resizeAround(panel, change)`. Tweens a panel's height across a rebuild so it folds instead of snapping. |
 | `format.js` | `num(value, step)` and `unitSuffix(unit)`. Keeps columns from jittering as values cross zero. |
+| `viewport.js` | `attachViewport(canvas, camera, {zoomIn, zoomOut, fit})`. One pointer drags, two pinch (zoom about the midpoint and pan with it), trackpad pinch (`wheel` + `ctrlKey`) zooms, plain wheel pans. Buttons zoom by `STEP = 1.25` about the visible middle; fit clears the user view. |
 | `inset.js` | `overlayInset(canvas, overlays)`. How much of the canvas the floating panels cover, per side. |
+| `fold.js` | `wireFolds(root)`. The chevron button atop each panel toggles `.folded`. Only the narrow-screen CSS honors it. |
 
 ## Details worth knowing
 
@@ -38,8 +41,11 @@ DOM panels. All of them are rebuilt from engine data, so a new scenario needs no
   only: the box, the marks and the engine stay in real units. `spec.marks` are the landmarks,
   each a clickable tick lit up when the value is within half a step of it; they are positioned
   against `--thumb`, so that token and the slider thumb have to agree.
-- `controls.js`: sliders come straight from `sim.schema()`, nothing names a parameter. Keys
-  matching `RESET_ONLY` (`/^initial_/`) get an "on reset" tag. `DT_CHOICES` is 1/240, 1/480, 1/960 s.
+- `controls.js`: rows come straight from `sim.schema()`, nothing names a parameter. A spec with
+  `widget.kind === "switch"` is a checkbox in `simple` mode (checked while above `min`, checking
+  sets `widget.on`, unchecking sets `min`) and a normal slider in `advanced`. Keys
+  matching `RESET_ONLY` (`/^initial_/`) get an "on reset" tag: they apply at once before Start
+  (the engine resets on a write while nothing has stepped) and wait for Reset after. `DT_CHOICES` is 1/240, 1/480, 1/960 s.
   In `simple` mode the advanced-tier specs are skipped; the tier is the engine's, from the
   control catalog in `physics-scenarios`.
 - `timescale.js`: reads and writes `sim.timeScale` and nothing else. The spec lives next to the
@@ -75,4 +81,7 @@ DOM panels. All of them are rebuilt from engine data, so a new scenario needs no
 - `format.js`: derives decimal places from the slider step, switches to exponential below 1e-3
   or at/above 1e6, and prints `--` for anything not finite.
 - `inset.js`: assigns each overlay to a side by comparing its rect to the canvas midlines.
-  Nothing here knows which panel is which. `GAP = 16 px`.
+  Nothing here knows which panel is which. `GAP = 16 px`. Only overlays that float count (the
+  element or an ancestor below the canvas's container is absolute, fixed or sticky), so the
+  in-flow panels of the phone layout never shrink the scene, even when scrolled.
+- `legend.js`: a `Couple` gets an arc swatch. The body row follows `frame.shape`: "Block", or "Stick" plus "Center of mass".

@@ -19,6 +19,7 @@ const FORCE_STYLES = {
   friction: { color: "#c9803f", dash: [] },
   applied: { color: "#f6d3b0", dash: [] },
   damping: { color: COLOR.muted, dash: [] },
+  pivot: { color: "#d8dde6", dash: [] },
 };
 
 const FORCE_FALLBACK = { color: COLOR.text, dash: [] };
@@ -38,6 +39,7 @@ const GUIDE_STYLES = {
   spring: { color: COLOR.text, width: 2, dash: [], hatch: false },
   reference: { color: COLOR.muted, width: 1, dash: [5, 5], hatch: false },
   axis: { color: COLOR.orange, width: 1.5, dash: [], hatch: false },
+  pivot: { color: COLOR.text, width: 2, dash: [], hatch: false },
 };
 
 const GUIDE_FALLBACK = { color: COLOR.muted, width: 1, dash: [3, 4], hatch: false };

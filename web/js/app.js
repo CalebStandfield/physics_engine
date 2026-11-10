@@ -15,7 +15,9 @@ import { buildLegend } from "./ui/legend.js";
 import { Readout } from "./ui/readout.js";
 import { buildTimeScale } from "./ui/timescale.js";
 import { overlayInset } from "./ui/inset.js";
+import { attachViewport } from "./ui/viewport.js";
 import { hydrateIcons } from "./ui/icons.js";
+import { wireFolds } from "./ui/fold.js";
 import { readRoute, setRoute, onRoute } from "./router.js";
 
 const el = (id) => document.getElementById(id);
@@ -24,6 +26,7 @@ async function main() {
   // Static markup names its icons with `data-icon`; swap them for real glyphs
   // before anything else so nothing pops in later.
   hydrateIcons(document);
+  wireFolds(document);
 
   let sim;
   try {
@@ -35,6 +38,11 @@ async function main() {
 
   const camera = new Camera();
   const scene = new SceneRenderer(el("scene"), camera);
+  attachViewport(el("scene"), camera, {
+    zoomIn: el("btn-zoom-in"),
+    zoomOut: el("btn-zoom-out"),
+    fit: el("btn-fit"),
+  });
   const fbd = new FbdRenderer(el("fbd"));
   // The readout folds rows open, which changes the panel's height; hand it the
   // same tween the mode switch uses.
@@ -122,7 +130,12 @@ async function main() {
     onStage = Boolean(id);
 
     if (id) {
-      if (id !== sim.id) sim.loadScenario(id);
+      // A new scenario starts from the fitted view; the old zoom meant
+      // nothing for this geometry.
+      if (id !== sim.id) {
+        sim.loadScenario(id);
+        camera.resetView();
+      }
       setActiveTab(el("tabs"), sim.catalog, id);
       rebuild();
     }
@@ -203,7 +216,7 @@ async function main() {
     const snap = sim.snap;
     const body = { mass: sim.getParam("mass"), range: massRange };
     scene.draw(snap.frame, body, overlayInset(el("scene"), overlays));
-    if (!showingTime) fbd.draw(snap.frame.forces, body);
+    if (!showingTime) fbd.draw(snap.frame, body);
     buildLegend(el("legend"), snap.frame);
     readout.update(sim, mode.readout);
 

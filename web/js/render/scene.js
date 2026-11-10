@@ -4,12 +4,17 @@
 // idea which scenario is running, so a new scenario needs no change here.
 
 import { COLOR, guideStyle, forceStyle } from "../theme.js";
-import { polyline, hatch, arrow, block, label, fitCanvas } from "./draw.js";
+import { polyline, hatch, arrow, turnArrow, block, label, fitCanvas } from "./draw.js";
 import { coilPoints } from "./spring.js";
 import { borderWidth } from "./mass.js";
+import { isRod, rod, pivot } from "./shape.js";
 
 // Painting order by guide kind. Lower draws first.
-const DEPTH = { reference: 0, surface: 1, anchor: 1, spring: 2, axis: 3 };
+const DEPTH = { reference: 0, surface: 1, anchor: 1, spring: 2, axis: 3, pivot: 4 };
+
+// Guides painted over the body rather than under it: a nail through a hole in
+// the stick has to show on top of the stick.
+const ABOVE_BODY = new Set(["pivot"]);
 
 // Guides that annotate the setup rather than being part of it. Everything else
 // is geometry the body actually touches.
@@ -19,6 +24,12 @@ const MAX_FORCE_PX = 110; // longest force arrow in the scene
 
 // Room left around the geometry for force arrows and their labels.
 const ARROW_ROOM = MAX_FORCE_PX + 40;
+
+// On a small canvas (a phone) both shrink, so the margins never eat the scene:
+// at most this share of the canvas's smaller side.
+const ROOM_SHARE = 0.22;
+
+const COUPLE_RADIUS = 16; // px, the curved arrow for a pure torque
 
 function pad(inset = {}, room) {
   return {
@@ -90,14 +101,35 @@ export class SceneRenderer {
     const { width, height } = fitCanvas(this.canvas, this.ctx);
     const guides = this.visible(frame.guides);
     this.camera.observe(frame, guides);
-    this.camera.fit(width, height, pad(inset, this.room));
+    // Arrows and their margin shrink together on a small canvas.
+    const short = Math.min(width, height);
+    const room = Math.min(this.room, short * ROOM_SHARE);
+    this.maxForcePx = MAX_FORCE_PX * (room / Math.max(this.room, 1e-9));
+    this.camera.fit(width, height, pad(inset, room));
     if (!this.camera.ready) return;
 
     const px = (p) => this.camera.toPx(p);
     guides.sort((a, b) => (DEPTH[a.kind] ?? 0) - (DEPTH[b.kind] ?? 0));
 
     const center = px(frame.body);
-    for (const guide of guides) this.drawGuide(guide, px, center);
+    const under = guides.filter((g) => !ABOVE_BODY.has(g.kind));
+    const over = guides.filter((g) => ABOVE_BODY.has(g.kind));
+    for (const guide of under) this.drawGuide(guide, px, center);
+
+    if (isRod(frame)) {
+      rod(this.ctx, center, frame, this.camera.scale, {
+        fill: COLOR.bodyFill,
+        stroke: COLOR.orange,
+        tick: COLOR.orangeDim,
+        dot: COLOR.orange,
+      });
+      for (const guide of over) this.drawGuide(guide, px, center);
+      if (this.forces) {
+        this.drawForces(frame.forces, center, 0, px);
+        this.drawCouples(frame.couples ?? [], px);
+      }
+      return;
+    }
 
     const side = this.bodySize(width, height);
     const pose = frame.pose ?? { angle: 0, support: { x: 0, y: 0 } };
@@ -116,7 +148,8 @@ export class SceneRenderer {
       angle: -pose.angle,
     });
 
-    if (this.forces) this.drawForces(frame.forces, seated, side);
+    for (const guide of over) this.drawGuide(guide, px, center);
+    if (this.forces) this.drawForces(frame.forces, seated, side / 2, px);
   }
 
   // The guides this renderer draws, in painting order.
@@ -134,6 +167,12 @@ export class SceneRenderer {
   drawGuide(guide, px, bodyPx) {
     const style = guideStyle(guide.kind);
     const pts = guide.points.map(px);
+
+    if (guide.kind === "pivot") {
+      for (const p of pts) pivot(this.ctx, p, { color: style.color, fill: COLOR.bodyFill });
+      return;
+    }
+
     if (pts.length < 2) return;
 
     if (guide.kind === "spring") {
@@ -164,15 +203,33 @@ export class SceneRenderer {
     }
   }
 
-  drawForces(forces, center, side) {
+  // Pure torques as curved arrows around where they act. A couple has no
+  // length to scale, so only its sense is drawn; the diagram gives the size.
+  drawCouples(couples, px) {
+    for (const c of couples) {
+      if (Math.abs(c.torque) < 1e-9) continue;
+      const at = px(c.at);
+      const style = forceStyle(c.kind);
+      turnArrow(this.ctx, at, COUPLE_RADIUS, c.torque > 0, { color: style.color });
+      if (this.labels) {
+        label(this.ctx, c.label, at.x + COUPLE_RADIUS + 6, at.y - COUPLE_RADIUS, {
+          color: style.color,
+          baseline: "bottom",
+        });
+      }
+    }
+  }
+
+  // A force with an `at` point starts there; one without starts at the body,
+  // pushed `offset` px out so it clears the drawn block.
+  drawForces(forces, center, offset, px) {
     const max = forces.reduce(
       (m, f) => Math.max(m, Math.hypot(f.vector.x, f.vector.y)),
       0,
     );
     if (max < 1e-9) return;
 
-    const perNewton = MAX_FORCE_PX / max;
-    const offset = side / 2;
+    const perNewton = this.maxForcePx / max;
 
     for (const f of forces) {
       const mag = Math.hypot(f.vector.x, f.vector.y);
@@ -181,7 +238,9 @@ export class SceneRenderer {
       // World y is up, canvas y is down.
       const ux = f.vector.x / mag;
       const uy = -f.vector.y / mag;
-      const from = { x: center.x + ux * offset, y: center.y + uy * offset };
+      const from = f.at
+        ? px(f.at)
+        : { x: center.x + ux * offset, y: center.y + uy * offset };
       const len = mag * perNewton;
       const to = { x: from.x + ux * len, y: from.y + uy * len };
 

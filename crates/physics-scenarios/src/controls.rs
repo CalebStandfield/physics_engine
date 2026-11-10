@@ -7,7 +7,7 @@
 //! overrides on the way out (`with_label`, `with_default`), never a second
 //! range.
 
-use physics_core::params::{mark, Mark, ParamSpec, Tier};
+use physics_core::params::{mark, Mark, ParamSpec, Tier, Widget};
 
 /// Shorthand so the table below reads as a table. One argument per `ParamSpec`
 /// field is the whole point here, so the arity lint does not apply.
@@ -31,6 +31,7 @@ const fn ctl(
         default,
         step,
         tier,
+        widget: Widget::Slider,
         marks: &[],
     }
 }
@@ -52,6 +53,11 @@ static ANGLE_MARKS: &[Mark] = &[
 static AT_REST: &[Mark] = &[mark(0.0, "At rest")];
 static EQUILIBRIUM: &[Mark] = &[mark(0.0, "Equilibrium")];
 static NO_FORCE: &[Mark] = &[mark(0.0, "No applied force")];
+static RELEASE_MARKS: &[Mark] = &[
+    mark(0.0, "Hanging straight down"),
+    mark(15.0, "15 deg, small-angle limit"),
+    mark(90.0, "Horizontal"),
+];
 
 /// Every control, in no particular order: the order a user sees is the order a
 /// scenario lists them in.
@@ -162,6 +168,43 @@ static CONTROLS: &[ParamSpec] = &[
         Tier::Advanced,
     )
     .with_marks(NO_FORCE),
+    // Pivoted rods.
+    ctl("rod_length", "Stick length", "m", 0.1, 3.0, 1.0, 0.01, Tier::Basic),
+    ctl(
+        "pivot_offset",
+        "Pivot distance from center",
+        "m",
+        0.01,
+        1.5,
+        0.5,
+        0.005,
+        Tier::Basic,
+    ),
+    ctl(
+        "initial_angle_deg",
+        "Release angle",
+        "deg",
+        -170.0,
+        170.0,
+        10.0,
+        0.5,
+        Tier::Basic,
+    )
+    .with_marks(RELEASE_MARKS),
+    ctl(
+        "initial_angular_velocity",
+        "Initial angular velocity",
+        "rad/s",
+        -20.0,
+        20.0,
+        0.0,
+        0.05,
+        Tier::Advanced,
+    )
+    .with_marks(AT_REST),
+    // Percent of the swing's energy friction takes each second. A checkbox in
+    // a simple panel, which turns on a small loss; a slider in an advanced one.
+    ctl("energy_loss", "Energy loss", "%/s", 0.0, 90.0, 0.0, 0.5, Tier::Basic).with_switch(5.0),
 ];
 
 /// Look up one control by key.
@@ -215,6 +258,15 @@ mod tests {
         assert_eq!(tuned.default, 0.25);
         assert_eq!(tuned.label, "Hanging mass");
         assert_eq!((tuned.min, tuned.max, tuned.step), (base.min, base.max, base.step));
+    }
+
+    #[test]
+    fn every_switch_turns_on_inside_its_range() {
+        for c in CONTROLS {
+            if let Widget::Switch { on } = c.widget {
+                assert!(c.min < on && on <= c.max, "{} switches on outside its range", c.key);
+            }
+        }
     }
 
     #[test]

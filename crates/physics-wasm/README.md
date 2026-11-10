@@ -21,7 +21,7 @@ Constructed with a scenario id. Holds a `Simulation` across calls.
 | `loadScenario(id)` | Swaps scenario, keeps integrator and step size. |
 | `scenarioId`, `scenarioName`, `description`, `coordinateLabel` | Getters. |
 | `schema()` | `ParamSpec[]`: key, label, unit, min, max, default, step, tier (`"basic"` or `"advanced"`), marks (`{value, label}[]`, the landmarks on the range). |
-| `getParam(key)`, `setParam(key, value)` | Writes take effect next step. `reset()` to restart from them. Out-of-range throws. |
+| `getParam(key)`, `setParam(key, value)` | Goes through `Simulation::set_param`: before the first step it also resets, so a starting value shows at once; after that, starting values wait for `reset()`. Out-of-range throws. |
 | `integratorId`, `setIntegrator(id)` | Unknown id throws. |
 | `dt` (get/set), `setHistory(capacity, stride)` | |
 | `reset()`, `step()`, `advance(elapsed)`, `runFor(duration)` | `advance` returns fixed steps run. |

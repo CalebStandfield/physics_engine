@@ -170,11 +170,11 @@ fn every_scenario_draws_forces_that_match_its_net_force() {
             State::new(0.6, s.initial_state().x - 0.1, -0.7),
         ] {
             let frame = s.frame(&state);
-            let drawn = frame.net_force().component_along(frame.axis);
+            let drawn = frame.generalized_force();
             let scalar = s.net_force(state.x, state.v, state.t);
             assert!(
                 (drawn - scalar).abs() < 1e-9,
-                "{id}: drew {drawn} N, computed {scalar} N"
+                "{id}: drew {drawn}, computed {scalar}"
             );
             assert!((frame.axis.len() - 1.0).abs() < 1e-12, "{id} axis not unit");
         }
@@ -407,4 +407,19 @@ fn every_derived_row_explains_itself_all_the_way_down() {
             }
         }
     }
+}
+
+#[test]
+fn starting_values_show_up_until_the_run_moves() {
+    let mut sim = Simulation::new(registry::create("pendulum").unwrap());
+    sim.set_param("initial_angle_deg", 30.0).unwrap();
+    assert!((sim.state().x - 30f64.to_radians()).abs() < 1e-12, "not started: applies now");
+
+    sim.step();
+    let moved = sim.state();
+    sim.set_param("initial_angle_deg", 60.0).unwrap();
+    assert_eq!(sim.state(), moved, "running: waits for reset");
+
+    sim.reset();
+    assert!((sim.state().x - 60f64.to_radians()).abs() < 1e-12);
 }

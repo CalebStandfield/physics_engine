@@ -1,4 +1,4 @@
-//! Prints the engine's own numbers for both scenarios, next to the hand
+//! Prints the engine's own numbers for every scenario, next to the hand
 //! calculation for each. Anything quoted in the write-up should come from here
 //! rather than from memory.
 //!
@@ -7,12 +7,14 @@
 use physics_core::analysis::percent_difference;
 use physics_core::scenario::Scenario;
 use physics_core::sim::Simulation;
-use physics_scenarios::{InclineScenario, SpringScenario};
+use physics_scenarios::{InclineScenario, PendulumScenario, SpringScenario};
 
 fn main() {
     spring_report();
     println!();
     incline_report();
+    println!();
+    pendulum_report();
 }
 
 fn spring_report() {
@@ -68,4 +70,90 @@ fn incline_report() {
         "  percent difference                        = {:.4} %",
         percent_difference(measured, predicted)
     );
+}
+
+fn pendulum(pivot: f64, release_deg: f64) -> PendulumScenario {
+    let mut s = PendulumScenario::new();
+    s.set_param("mass", 0.15).unwrap();
+    s.set_param("rod_length", 1.0).unwrap();
+    s.set_param("pivot_offset", pivot).unwrap();
+    s.set_param("initial_angle_deg", release_deg).unwrap();
+    s
+}
+
+/// Period the engine measures over a run of many cycles, at a fine step.
+fn simulated_period(s: PendulumScenario) -> f64 {
+    let span = 20.0 * s.ideal_period();
+    let mut sim = Simulation::new(Box::new(s));
+    sim.set_dt(1e-4);
+    sim.run_for(span);
+    sim.measured_period().unwrap()
+}
+
+fn pendulum_report() {
+    let base = pendulum(0.5, 5.0);
+    println!("Pendulum: 0.150 kg, 1.00 m stick, released at 5 deg");
+    println!(
+        "  shortest-period pivot  d_min = L / sqrt(12)       = {:.6} m",
+        base.shortest_period_pivot()
+    );
+    println!(
+        "  shortest period        T_min = 2 pi sqrt(2 d / g) = {:.6} s",
+        base.shortest_period()
+    );
+    println!("  d (m)   T_0 small-angle   T exact at 5 deg   simulated   diff vs exact");
+    for d in [0.05, 0.10, 0.20, base.shortest_period_pivot(), 0.30, 0.40, 0.50] {
+        let s = pendulum(d, 5.0);
+        let ideal = s.ideal_period();
+        let exact = s.amplitude_period().unwrap();
+        let measured = simulated_period(s);
+        println!(
+            "  {d:.4}  {ideal:.6} s        {exact:.6} s         {measured:.6} s  {:.4} %",
+            percent_difference(measured, exact)
+        );
+    }
+
+    println!("  Pivot at the end, wider releases:");
+    println!("  release   T_0 small-angle   T exact   simulated   T_0 off by");
+    for release in [10.0, 30.0, 60.0, 90.0, 150.0] {
+        let s = pendulum(0.5, release);
+        let ideal = s.ideal_period();
+        let exact = s.amplitude_period().unwrap();
+        let measured = simulated_period(s);
+        println!(
+            "  {release:>5.0} deg  {ideal:.6} s        {exact:.6} s  {measured:.6} s  {:.4} %",
+            percent_difference(ideal, measured)
+        );
+    }
+
+    // Energy loss on, at what the checkbox sets. Largest angle seen in each
+    // second of the run, so the decay reads as a list.
+    let mut s = pendulum(0.5, 10.0);
+    let on = match physics_scenarios::control("energy_loss").widget {
+        physics_core::params::Widget::Switch { on } => on,
+        physics_core::params::Widget::Slider => unreachable!("energy_loss is a switch"),
+    };
+    s.set_param("energy_loss", on).unwrap();
+    let b = s.damping();
+    let floor = -s.params().mass * s.params().gravity * s.pivot_distance();
+    let start = s.initial_state();
+    let e0 = s.derived(&start).iter().find(|d| d.key == "mechanical_energy").unwrap().value;
+    let mut sim = Simulation::new(Box::new(s));
+    sim.set_dt(1e-4);
+    println!("  Energy loss on, {on} %/s (b = -I ln(1 - p/100) = {b:.6} N m s), pivot at the end, released at 10 deg:");
+    for second in 1..=10 {
+        let mut peak: f64 = 0.0;
+        while sim.state().t < second as f64 {
+            sim.step();
+            peak = peak.max(sim.state().x.abs());
+        }
+        let e = sim.snapshot().derived_value("mechanical_energy").unwrap();
+        println!(
+            "  t = {second:>2} s  largest angle {:.3} deg  swing energy left {:.2} %  lost {:.6} J (ledger {:.6} J)",
+            peak.to_degrees(),
+            100.0 * (e - floor) / (e0 - floor),
+            e0 - e,
+            sim.energy_lost()
+        );
+    }
 }

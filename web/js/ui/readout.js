@@ -31,6 +31,18 @@ const COMPARISONS = {
       predicted: "ideal_sliding_accel",
     },
   ],
+  pendulum: [
+    {
+      label: "Period vs small-angle",
+      measured: (sim) => sim.snap.measured_period,
+      predicted: "ideal_period",
+    },
+    {
+      label: "Period vs exact",
+      measured: (sim) => sim.snap.measured_period,
+      predicted: "amplitude_period",
+    },
+  ],
 };
 
 export class Readout {

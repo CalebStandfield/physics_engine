@@ -144,7 +144,6 @@ impl Engine {
     #[wasm_bindgen(js_name = setParam)]
     pub fn set_param(&mut self, key: &str, value: f64) -> Result<(), JsError> {
         self.sim
-            .scenario_mut()
             .set_param(key, value)
             .map_err(|e| JsError::new(&e.to_string()))
     }
